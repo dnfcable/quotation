@@ -694,9 +694,14 @@ function generateQuotation(){
     customer: ST.customer||{},
     items:    ST.items
   };
-  // When running from a website (GitHub Pages, Synology, etc.) always use built-in quotation
+  // When running from a website (GitHub Pages, Synology, etc.) open hosted DNF Quotation.html
   const isWeb=location.protocol==='https:'||location.protocol==='http:';
-  if(isWeb){ openMobileQuotation(data); return; }
+  if(isWeb){
+    const hash='#dnfq='+encodeURIComponent(JSON.stringify(data));
+    const w=window.open('DNF%20Quotation.html'+hash,'_blank');
+    if(!w) openMobileQuotation(data); // fallback if popup blocked
+    return;
+  }
   // Local file: mobile → built-in, desktop → external file
   const cfgPath=load('cfg',{}).quotationPath||'';
   if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)){
