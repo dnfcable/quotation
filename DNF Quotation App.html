@@ -693,15 +693,55 @@ function pickCustomer(){
       <div class="ci-info"><div class="ci-name">${esc(c.company)}</div>
         <div class="ci-sub">${[c.attn,c.tel].filter(Boolean).join(' · ')}</div></div>
     </div>`).join('')
-    :`<div style="padding:30px;text-align:center;color:#a0aec0">No customers saved yet.<br>Go to Customers tab to add one.</div>`;
+    :`<div style="padding:30px;text-align:center;color:#a0aec0">No customers yet.<br>Tap <b>+ New Customer</b> below to add one.</div>`;
   openSheet(`
     <div style="padding:10px 14px 4px"><input class="inp" id="cpick-q" placeholder="🔍  Search…" oninput="filterCustPick(this.value)"></div>
     <div id="cpick-list">${rows}</div>
-    <div class="sh-foot"><button class="btn btn-grey btn-full" onclick="loadCust(-1)">No Customer (Walk-in)</button></div>
+    <div class="sh-foot" style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-navy btn-full" onclick="pickCustNew()">＋ New Customer</button>
+      <button class="btn btn-grey btn-full" onclick="loadCust(-1)">No Customer (Walk-in)</button>
+    </div>
   `, 'Select Customer');
 }
 function filterCustPick(q){ document.querySelectorAll('#cpick-list .cust-item').forEach(r=>{ r.style.display=r.textContent.toLowerCase().includes(q.toLowerCase())?'':'none'; }); }
 function loadCust(i){ if(i<0){ST.customer=null;}else{ST.customer={...load('custs',[])[i]};} closeSheet(); renderQuote(); }
+
+// ── New Customer inline form (from quote page picker) ─────────
+function pickCustNew(){
+  document.querySelector('#sheet-inner .sh-title').textContent='New Customer';
+  document.getElementById('sh-content').innerHTML=`
+    <div class="sh-body">
+      <div><label class="lbl">Company Name *</label>
+        <input class="inp" id="cf-co" placeholder="Company name"></div>
+      <div><label class="lbl">Contact Person</label>
+        <input class="inp" id="cf-at" placeholder="Name"></div>
+      <div class="row2">
+        <div><label class="lbl">Phone *</label>
+          <input class="inp" id="cf-tel" type="tel" placeholder="01x-xxxxxxx"></div>
+        <div><label class="lbl">Email</label>
+          <input class="inp" id="cf-em" type="email" placeholder="email@…"></div>
+      </div>
+      <div><label class="lbl">Notes</label>
+        <input class="inp" id="cf-nt" placeholder="Notes…"></div>
+    </div>
+    <div class="sh-foot" style="display:flex;gap:8px">
+      <button class="btn btn-grey" onclick="pickCustomer()">← Back</button>
+      <button class="btn btn-navy btn-full" onclick="savePickCust()">✔ Save &amp; Use</button>
+    </div>`;
+  setTimeout(()=>{ const el=$('cf-co'); if(el) el.focus(); },100);
+}
+window.savePickCust=function(){
+  const co=($('cf-co').value||'').trim();
+  const tel=($('cf-tel').value||'').trim();
+  if(!co){ toast('Company name is required'); return; }
+  if(!tel){ toast('Phone number is required'); return; }
+  const e={company:co,attn:($('cf-at').value||'').trim(),tel,email:($('cf-em').value||'').trim(),notes:($('cf-nt').value||'').trim()};
+  const c=load('custs',[]); c.push(e); save('custs',c);
+  ST.customer={...e};
+  closeSheet();
+  renderQuote();
+  toast('Customer saved & loaded ✓');
+};
 
 // ══════════════════════════════════════════════════════════════
 //  ADD / EDIT ITEM MODAL
