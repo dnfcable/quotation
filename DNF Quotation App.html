@@ -441,7 +441,7 @@ function editItem(i){openItemModal(i);}
 
 // ── WhatsApp ─────────────────────────────────────────────────
 function buildMsg(){
-  const lines=[`📅 *${ST.date}*\n`];
+  const lines=[`\u{1F4C5} *${ST.date}*\n`];
   ST.items.forEach(it=>{
     const s=it.stock||'exstock';
     const pfx=s==='no need to check'?'':s==='exstock'?'✅':'❌';
