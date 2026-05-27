@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html><!-- v9 -->
+﻿<!DOCTYPE html><!-- v10 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -666,14 +666,12 @@ function generateQuotation(){
     items:    ST.items
   };
   // When running from a website (GitHub Pages, Synology, etc.) always use built-in quotation
-  const cfgPath=load('cfg',{}).quotationPath||'';
   const isWeb=location.protocol==='https:'||location.protocol==='http:';
-  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if(isWeb||isMobile){
-    if(!cfgPath||cfgPath.startsWith('file://')){
-      openMobileQuotation(data);
-      return;
-    }
+  if(isWeb){ openMobileQuotation(data); return; }
+  // Local file: mobile → built-in, desktop → external file
+  const cfgPath=load('cfg',{}).quotationPath||'';
+  if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)){
+    if(!cfgPath||cfgPath.startsWith('file://')){ openMobileQuotation(data); return; }
   }
   // Desktop local only: open DNF Quotation.html via configured path
   const hash='#dnfq='+encodeURIComponent(JSON.stringify(data));
