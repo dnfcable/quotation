@@ -665,14 +665,17 @@ function generateQuotation(){
     customer: ST.customer||{},
     items:    ST.items
   };
-  // On phone/tablet file:// paths are blocked — generate a self-contained quotation page
-  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  // When running from a website (GitHub Pages, Synology, etc.) always use built-in quotation
   const cfgPath=load('cfg',{}).quotationPath||'';
-  if(isMobile&&(!cfgPath||cfgPath.startsWith('file://'))){
-    openMobileQuotation(data);
-    return;
+  const isWeb=location.protocol==='https:'||location.protocol==='http:';
+  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(isWeb||isMobile){
+    if(!cfgPath||cfgPath.startsWith('file://')){
+      openMobileQuotation(data);
+      return;
+    }
   }
-  // Desktop: open DNF Quotation.html via configured path or default Windows path
+  // Desktop local only: open DNF Quotation.html via configured path
   const hash='#dnfq='+encodeURIComponent(JSON.stringify(data));
   const quotePath=(cfgPath||'file:///C:/Users/edwin/Downloads/DNF%20Quotation.html')+hash;
   const w=window.open(quotePath,'_blank');
