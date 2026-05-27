@@ -248,7 +248,7 @@ const GROUPS = {
 const SIZES_1C  = ["1.5mm²","2.5mm²","4mm²","6mm²","10mm²","16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²","500mm²","630mm²"];
 const SIZES_4CA = ["1.5mm²","2.5mm²","4mm²","6mm²","10mm²","16mm² (PSP)","16mm²","25mm² (PSP)","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²"];
 const SIZES_32A = ["1.5mm²","2.5mm²","4mm²","6mm²","10mm²","16mm²","25mm²"];
-const SIZES_MC  = ["2c","3c","4c","5c","6c","7c","8c","10c","12c","14c","16c","19c","24c","27c","30c","37c"];
+const SIZES_MC  = ["5c","7c","9c","12c","19c","27c","37c"];
 const SIZES_NX  = ["1.5mm²","2.5mm²","4mm²","6mm²","10mm²","16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²"];
 const SIZES_ALU = ["16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²","500mm²","630mm²"];
 const SIZES_ALA = ["16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²"];
@@ -334,7 +334,7 @@ function phone(raw){ const d=raw.replace(/\D/g,''); return d.startsWith('60')?d:
 function toast(msg,ms=2200){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),ms); }
 
 // ── State ────────────────────────────────────────────────────
-let ST = { tab:'quote', customer:null, items:[], ref:'', date:'' };
+let ST = { tab:'quote', customer:null, items:[], ref:'', date:'', sst:null };
 
 // ══════════════════════════════════════════════════════════════
 //  BOTTOM SHEET
@@ -418,15 +418,22 @@ function renderQuote(){
       ? `<div class="drum-row"><div><b>🥁 Drum Charges</b><br><small style="color:#718096">${drumCount} drum${drumCount>1?'s':''} × RM${DRUM_PRICE}</small></div><b>RM ${rm(drumCount*DRUM_PRICE)}</b></div>` : '';
 
     const cfg = settings();
+    if(ST.sst===null) ST.sst = cfg.sst!==false; // init from global setting on first render
     const sub  = ST.items.reduce((s,it)=>s+(it.price||0)*(it.qty||0),0);
     const dAmt = drumCount*DRUM_PRICE;
-    const sst  = cfg.sst?(sub+dAmt)*SST:0;
+    const sst  = ST.sst?(sub+dAmt)*SST:0;
     const tot  = sub+dAmt+sst;
+    const sstToggle = ST.sst
+      ? `<button onclick="toggleSST()" style="font-size:11px;padding:2px 9px;border-radius:10px;border:1px solid #276749;background:#c6f6d5;color:#276749;cursor:pointer;font-weight:600">✓ Include</button>`
+      : `<button onclick="toggleSST()" style="font-size:11px;padding:2px 9px;border-radius:10px;border:1px solid #a0aec0;background:#e2e8f0;color:#718096;cursor:pointer;font-weight:600">Exclude</button>`;
 
     itemsHtml = ic + drumRow + `
       <div class="totals">
         <div class="tot-row"><span>Sub Total</span><span>RM ${rm(sub+dAmt)}</span></div>
-        ${cfg.sst?`<div class="tot-row"><span>SST (10%)</span><span>RM ${rm(sst)}</span></div>`:''}
+        <div class="tot-row" style="align-items:center">
+          <span style="display:flex;align-items:center;gap:8px">SST (10%) ${sstToggle}</span>
+          <span>${ST.sst?'RM '+rm(sst):'—'}</span>
+        </div>
         <div class="tot-row grand"><span>TOTAL</span><span>RM ${rm(tot)}</span></div>
       </div>
       <div style="display:flex;gap:9px">
@@ -454,10 +461,11 @@ function renderQuote(){
   fab.onclick=()=>openItemModal(-1);
 
   $('btn-sel-cust')?.addEventListener('click',pickCustomer);
-  $('btn-new')?.addEventListener('click',()=>{ if(!ST.items.length||confirm('Start a new quotation? Current items will be cleared.')){ST.items=[];ST.customer=null;ST.ref=genRef();ST.date=today();renderQuote();}});
+  $('btn-new')?.addEventListener('click',()=>{ if(!ST.items.length||confirm('Start a new quotation? Current items will be cleared.')){ST.items=[];ST.customer=null;ST.ref='';ST.date=today();ST.sst=null;renderQuote();}});
   $('btn-wa-icon')?.addEventListener('click',()=>showWAPreview(false));
 }
 
+function toggleSST(){ ST.sst=!ST.sst; renderQuote(); }
 function toggleItem(i){
   const c=document.getElementById('ic'+i);
   const open=c.classList.contains('open');
@@ -690,7 +698,7 @@ function generateQuotation(){
     ref:      ST.ref,
     date:     ST.date,
     salesman: cfg.salesman||'',
-    sst:      cfg.sst!==false,
+    sst:      ST.sst!==false,
     customer: ST.customer||{},
     items:    ST.items
   };
@@ -1679,9 +1687,14 @@ function parseExcelPrices(wb){
   for(const[lbl,s,e]of[['CU/PVC/SWA/PVC 3c',71,77],['CU/PVC/SWA/PVC 2c',83,89]]){
     db[lbl]={};for(let i=s;i<=e;i++){const row=cu[i]||[];const size=sz(row[2]);if(!size)continue;db[lbl][size]=cuE(row);}
   }
-  // Multicore armoured
+  // Multicore armoured — positional mapping (row order = 5c,7c,9c,12c,19c,27c,37c)
+  // Do NOT rely on column C — multicore rows may have no size label there
+  const MC_SIZES=['5c','7c','9c','12c','19c','27c','37c'];
   for(const[lbl,s,e]of[['CU Arm Multicore 1.5mm²',95,101],['CU Arm Multicore 2.5mm²',107,113]]){
-    db[lbl]={};for(let i=s;i<=e;i++){const row=cu[i]||[];const size=sz(row[2]);if(!size)continue;db[lbl][size]=cuE(row);}
+    db[lbl]={};
+    for(let i=s,idx=0;i<=e&&idx<MC_SIZES.length;i++,idx++){
+      db[lbl][MC_SIZES[idx]]=cuE(cu[i]||[]);
+    }
   }
   // Non-armoured (XP = XLPE/PVC, PP = PVC/PVC — same prices)
   for(const[xp,pp,s,e]of[['CU/XLPE/PVC 4c','CU/PVC/PVC 4c',119,134],['CU/XLPE/PVC 3c','CU/PVC/PVC 3c',140,146],['CU/XLPE/PVC 2c','CU/PVC/PVC 2c',152,158]]){
@@ -1987,7 +2000,7 @@ async function generatePDFApp(){
   const data={
     ref:ST.ref, date:ST.date,
     salesman:cfg.salesman||'',
-    sst:cfg.sst!==false,
+    sst:ST.sst!==false,
     customer:ST.customer||{},
     items:ST.items
   };
