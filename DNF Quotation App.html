@@ -313,6 +313,57 @@ async function doLogout(){
   location.reload();
 }
 
+// ── Change Password ───────────────────────────────────────────────────────────
+function showChangePwd(){
+  openSheet(`
+    <div class="sh-body">
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#444;margin-bottom:5px">Current Password</label>
+        <input type="password" id="cp-cur" class="inp" placeholder="Enter current password" autocomplete="current-password">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#444;margin-bottom:5px">New Password</label>
+        <input type="password" id="cp-new" class="inp" placeholder="Min. 6 characters" autocomplete="new-password">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#444;margin-bottom:5px">Confirm New Password</label>
+        <input type="password" id="cp-cfm" class="inp" placeholder="Repeat new password" autocomplete="new-password">
+      </div>
+      <div id="cp-err" style="color:#c62828;font-size:12px;min-height:16px"></div>
+    </div>
+    <div class="sh-foot">
+      <button class="btn btn-grey btn-full" onclick="closeSheet()">Cancel</button>
+      <button id="cp-save-btn" class="btn btn-navy btn-full" onclick="doChangePassword()">Save</button>
+    </div>
+  `, 'Change Password');
+}
+
+async function doChangePassword(){
+  const cur=(document.getElementById('cp-cur').value||'');
+  const np =(document.getElementById('cp-new').value||'');
+  const cfm=(document.getElementById('cp-cfm').value||'');
+  const err=document.getElementById('cp-err');
+  err.textContent='';
+  if(!cur||!np||!cfm){ err.textContent='Please fill in all fields.'; return; }
+  if(np.length<6){ err.textContent='New password must be at least 6 characters.'; return; }
+  if(np!==cfm){ err.textContent='New passwords do not match.'; return; }
+  const user=_auth.currentUser;
+  if(!user){ err.textContent='Not logged in.'; return; }
+  const btn=document.getElementById('cp-save-btn');
+  if(btn){ btn.textContent='Saving…'; btn.disabled=true; }
+  try{
+    const cred=firebase.auth.EmailAuthProvider.credential(user.email,cur);
+    await user.reauthenticateWithCredential(cred);
+    await user.updatePassword(np);
+    closeSheet();
+    toast('Password changed successfully!');
+  }catch(e){
+    if(btn){ btn.textContent='Save'; btn.disabled=false; }
+    const bad=['auth/wrong-password','auth/invalid-credential'];
+    err.textContent=bad.includes(e.code)?'Current password is incorrect.':'Failed. Check your connection and try again.';
+  }
+}
+
 // â”€â”€ Apply session (show name + logout in header) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function _applySession(user){
   const name=user.displayName||(user.email.split('@')[0].replace(/[._-]/g,' ').replace(/\b\w/g,c=>c.toUpperCase()));
@@ -321,6 +372,8 @@ function _applySession(user){
   if(hr) hr.innerHTML=
     '<span style="font-size:9px;color:#ccc;margin-right:6px">'+name+'</span>'+
     '<button onclick="doLogout()" style="padding:3px 10px;background:#546E7A;color:#fff;border:none;border-radius:3px;font-size:9px;cursor:pointer">Logout</button>';
+  const ue=document.getElementById('cfg-user-email');
+  if(ue){ ue.textContent=user.email; }
 }
 
 // â”€â”€ Auth state listener (fires on every load) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1754,6 +1807,24 @@ function renderCfg(){
       <div class="srow">
         <div><div class="srow-lbl">Import Backup</div><div class="srow-sub">Restore from exported file</div></div>
         <button class="btn btn-sm btn-amber" onclick="importAll()">⬆ Import</button>
+      </div>
+    </div>
+
+    <div class="stitle">Account</div>
+    <div class="scard">
+      <div class="srow">
+        <div>
+          <div class="srow-lbl" id="cfg-user-email" style="color:#1a3a6b">Not logged in</div>
+          <div class="srow-sub">Currently signed-in account</div>
+        </div>
+      </div>
+      <div class="srow" style="border-top:1px solid #edf2f7">
+        <div><div class="srow-lbl">Change Password</div><div class="srow-sub">Update your login password</div></div>
+        <button class="btn btn-sm btn-navy" onclick="showChangePwd()">Change</button>
+      </div>
+      <div class="srow" style="border-top:1px solid #edf2f7">
+        <div><div class="srow-lbl">Logout</div><div class="srow-sub">Sign out of this device</div></div>
+        <button class="btn btn-sm btn-red" onclick="doLogout()">Logout</button>
       </div>
     </div>
 
