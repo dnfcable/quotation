@@ -1179,9 +1179,9 @@ function renderItemSheet(ex){
         <div>
           <label class="lbl">Stock Status</label>
           <select class="inp" id="sel-stock">
-            <option value="exstock"          ${(ex?.stock||'exstock')==='exstock'?'selected':''}>✅ In Stock</option>
+            <option value="exstock"          ${ex?.stock==='exstock'?'selected':''}>✅ In Stock</option>
             <option value="no stock"         ${ex?.stock==='no stock'?'selected':''}>❌ No Stock</option>
-            <option value="no need to check" ${ex?.stock==='no need to check'?'selected':''}>— Skip</option>
+            <option value="no need to check" ${(ex?.stock||'no need to check')==='no need to check'?'selected':''}>— Skip</option>
           </select>
         </div>
         <div>
@@ -1334,7 +1334,7 @@ function saveItem(){
   const price=parseFloat($('inp-price')?.value)||0;
   const qty=parseInt($('inp-qty')?.value)||1;
   const unit=$('sel-unit')?.value||'Meter';
-  const stock=$('sel-stock')?.value||'exstock';
+  const stock=$('sel-stock')?.value||'no need to check';
   const drum=$('chk-drum')?.checked||false;
   const remarks=$('inp-rem')?.value?.trim()||'';
 
