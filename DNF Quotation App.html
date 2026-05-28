@@ -605,7 +605,7 @@ function renderQuote(){
           </div>
           <div class="item-right">
             <div class="item-amt">RM ${rm(amt)}</div>
-            <div class="item-qp">${+it.qty} ${it.unit||'Mtr'} × RM${(+it.price).toFixed(4)}</div>
+            <div class="item-qp">${+it.qty} ${it.unit||'Mtr'} × RM${(+it.price).toFixed(2)}</div>
           </div>
         </div>
         <div class="item-btns">
@@ -743,6 +743,9 @@ function _pvcConvert(cat, sizeKey, tierPrice){
   if(sz>=25)       return {price:_pvcPriceFor(cat,sizeKey,tierPrice,'Coil'),  unit:'Coil'};
   return {price:tierPrice, unit:null};
 }
+
+// Round price to nearest RM0.05
+function r05(v){ return Math.round(v / 0.05) * 0.05; }
 
 function buildDesc(it){
   const cat=it.category;
@@ -1094,9 +1097,9 @@ function renderItemSheet(ex){
   const unit = ex?.unit||(autoUnit||'Meter');
   // Convert using the resolved unit so price label matches
   const basePrice = rawBase!=null ? _pvcPriceFor(curCat,curSize,rawBase,unit) : null;
-  const autoPrice = basePrice!=null ? basePrice*(1+markup/100) : (ex?.price||'');
+  const autoPrice = basePrice!=null ? r05(basePrice*(1+markup/100)) : (ex?.price||'');
   const markupPreview = (markup>0 && basePrice!=null)
-    ? `RM${Number(basePrice).toFixed(4)} + ${markup}% → RM${Number(autoPrice).toFixed(4)}`
+    ? `RM${Number(basePrice).toFixed(4)} + ${markup}% → RM${Number(autoPrice).toFixed(2)}`
     : '';
   const p = autoPrice;
   const q = ex?.qty||'';
@@ -1255,7 +1258,7 @@ function onSizeChange(val){
       if(p0!=null){
         const mu=parseFloat($('inp-markup')?.value)||0;
         const {price:cv,unit:au}=_pvcConvert(curCat,val,p0);
-        $('inp-price').value=Number(cv*(1+mu/100)).toFixed(4);
+        $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
         _updateMarkupPreview(cv,mu);
         if(au){const us=$('sel-unit');if(us)us.value=au;}
         const lp=$('lbl-price');if(lp)lp.textContent=`Price per ${au||'Meter'} (RM)`;
@@ -1275,7 +1278,7 @@ function onTierChange(val){
     const mu=parseFloat($('inp-markup')?.value)||0;
     const curUnit=$('sel-unit')?.value||'Meter';
     const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-    $('inp-price').value=Number(cv*(1+mu/100)).toFixed(4);
+    $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
     _updateMarkupPreview(cv,mu);
   }
 }
@@ -1288,7 +1291,7 @@ function onMarkupChange(){
   const mu=parseFloat($('inp-markup')?.value)||0;
   const curUnit=$('sel-unit')?.value||'Meter';
   const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-  $('inp-price').value=Number(cv*(1+mu/100)).toFixed(4);
+  $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
   _updateMarkupPreview(cv,mu);
 }
 
@@ -1301,7 +1304,7 @@ function onUnitChange(val){
   if(base==null) return;
   const mu=parseFloat($('inp-markup')?.value)||0;
   const cv=_pvcPriceFor(curCat,curSize,base,val);
-  $('inp-price').value=Number(cv*(1+mu/100)).toFixed(4);
+  $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
   _updateMarkupPreview(cv,mu);
   const lp=$('lbl-price');if(lp)lp.textContent=`Price per ${val} (RM)`;
 }
@@ -1309,7 +1312,7 @@ function onUnitChange(val){
 function _updateMarkupPreview(base,mu){
   const el=$('markup-preview'); if(!el) return;
   el.textContent=mu>0
-    ?`RM${Number(base).toFixed(4)} + ${mu}% → RM${Number(base*(1+mu/100)).toFixed(4)}`
+    ?`RM${Number(base).toFixed(4)} + ${mu}% → RM${r05(base*(1+mu/100)).toFixed(2)}`
     :'';
 }
 
