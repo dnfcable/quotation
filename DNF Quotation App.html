@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html><!-- v21 -->
+﻿<!DOCTYPE html><!-- v26 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -267,7 +267,23 @@ async function _pullData(uid){
     const doc=await _db.collection('users').doc(uid).collection('data').doc('app').get();
     if(doc.exists){
       const d=doc.data();
-      _SYNC_KEYS.forEach(k=>{ if(d[k]!==undefined) localStorage.setItem('dnf_'+k,JSON.stringify(d[k])); });
+      // Helper: parse DD/MM/YYYY → sortable integer (e.g. 20260528)
+      const parseDMY=s=>{const p=(s||'').split('/');return p.length===3?parseInt(p[2])*10000+parseInt(p[1])*100+parseInt(p[0]):0;};
+      _SYNC_KEYS.forEach(k=>{
+        if(d[k]===undefined) return;
+        // Prices: only overwrite local if Firestore date is strictly newer.
+        // This prevents old/incomplete Firestore data from clobbering a
+        // freshly-imported price file that now contains correct ALU/FR prices.
+        if(k==='prices'){
+          const localDate=(load('prices',{}).date)||'';
+          const remoteDate=(d[k]&&d[k].date)||'';
+          if(localDate && parseDMY(localDate)>=parseDMY(remoteDate)){
+            console.log(`[DNF] Local prices (${localDate}) >= Firestore (${remoteDate}) -- keeping local`);
+            return;
+          }
+        }
+        localStorage.setItem('dnf_'+k,JSON.stringify(d[k]));
+      });
     }
   }catch(e){ console.warn('Firestore pull failed:',e.message); }
 }
@@ -1007,7 +1023,11 @@ function lookupTiers(cat,size){
   // User types may map to a different price-DB key
   const ut=load('userCableTypes',[]).find(t=>t.key===cat);
   const priceKey=(ut?.priceKey)||cat;
-  return priceDB()[priceKey]?.[size]||{};
+  const catDB=priceDB()[priceKey]||{};
+  if(catDB[size]) return catDB[size];
+  // Fallback: try mm²↔mm2 swap for data imported before normalisation fix
+  const alt=size.includes('mm²')?size.replace(/mm²/g,'mm2'):size.replace(/mm2/gi,'mm²');
+  return catDB[alt]||{};
 }
 function hasPrices(){ return Object.keys(priceDB()).length>0; }
 
@@ -1200,6 +1220,13 @@ function onTypeChange(val){
 function onSizeChange(val){
   curSize=val;
   const tierData=lookupTiers(curCat,val);
+  // ── Diagnostic: warn if category has data but this size is missing ──
+  if(hasPrices()&&val&&curCat&&Object.keys(tierData).length===0){
+    const catDB=priceDB()[curCat]||{};
+    const nSizes=Object.keys(catDB).length;
+    if(nSizes===0) toast(`⚠️ No prices for "${curCat}" — re-import the price file.`,5000);
+    else toast(`⚠️ Size "${val}" not found in "${curCat}" (${nSizes} sizes in DB). Check Excel file.`,5000);
+  }
   const tiers=tiersFor(curCat);
   const tr=$('tier-row');
   const mr=$('markup-row');
@@ -1875,8 +1902,15 @@ function loadSheetJS(cb){
 function parseExcelPrices(wb){
   const db={};
   const sf=v=>{if(v===null||v===undefined||v==='')return null;const f=parseFloat(v);return isNaN(f)?null:f};
-  const sz=v=>{if(v===null||v===undefined)return null;const s=String(v).trim();return(!s||s.toLowerCase()==='nan')?null:s};
+  // Normalise size strings: strip spaces before "mm", convert mm2 → mm² (superscript)
+  const sz=v=>{
+    if(v===null||v===undefined)return null;
+    const s=String(v).trim().replace(/\s+(?=mm)/gi,'').replace(/mm\s*2\b/gi,'mm²');
+    return(!s||s.toLowerCase()==='nan')?null:s;
+  };
   const getRows=name=>{const ws=wb.Sheets[name];return ws?XLSX.utils.sheet_to_json(ws,{header:1,defval:null}):[]};
+  // Try multiple sheet name variants to be resilient to naming differences
+  const getRowsAny=(...names)=>{for(const n of names){const r=getRows(n);if(r.length)return r;}return[]};
 
   // Read CS price from Masterlist cell Q4 (row 4, column Q = 17th col)
   let csUSD='';
@@ -1891,16 +1925,16 @@ function parseExcelPrices(wb){
   }catch(e){}
 
   const CU ={'+3':6,'+2':8,'+1':10,'+0':12,'-1':14,'-2':16,'Below 100m':18,'Below 50m':20};
-  const ALU={'+3':5,'+2':7,'+1':9,'+0':11,'-1':13,'-2':15,'-3':17,'Below 200m':19,'Below 100m':21};
-  const FR ={'+3':4,'+2':6,'+1':8,'+0':10,'-1':12,'-2':14};
+  const ALU={'+3':4,'+2':6,'+1':8,'+0':10,'-1':12,'-2':14,'-3':16,'Below 200m':18,'Below 100m':20};
+  const FR ={'+3':3,'+2':5,'+1':7,'+0':9,'-1':11,'-2':13};
 
   const cuE =row=>{const e={offer:sf(row[4])};for(const[t,c]of Object.entries(CU))e[t]=sf(row[c]);return e};
   const aluE=row=>{const e={};for(const[t,c]of Object.entries(ALU))e[t]=sf(row[c]);return e};
   const frE =row=>{const e={};for(const[t,c]of Object.entries(FR))e[t]=sf(row[c]);return e};
 
   const cu=getRows('Copper Price List');
-  const alu=getRows('Alu Price List');
-  const fr=getRows('FR Price List');
+  const alu=getRowsAny('Alu Price List','Aluminium Price List','ALU Price List','Aluminum Price List');
+  const fr=getRowsAny('FR Price List','FR Cable Price List','Fire Resistant Price List','FR cable price list');
 
   // Single-core copper
   for(const[lbl,s,e]of[['CU/PVC 1c',6,21],['CU/XLPE/PVC 1c',27,41]]){
@@ -1943,13 +1977,13 @@ function parseExcelPrices(wb){
   }
 
   // Aluminium
-  for(const[lbl,s,e]of[['ALU/PVC 1c',6,19],['ALU/XLPE/PVC 1c',25,38],['ALU/XLPE/SWA/PVC 4c',44,55],['ALU/XLPE/SWA/PVC 3c',61,63],['ALU/XLPE/SWA/PVC 2c',69,71]]){
-    db[lbl]={};for(let i=s;i<=e;i++){const row=alu[i]||[];const size=sz(row[2]);if(!size)continue;db[lbl][size]=aluE(row);}
+  for(const[lbl,s,e]of[['ALU/PVC 1c',5,18],['ALU/XLPE/PVC 1c',24,37],['ALU/XLPE/SWA/PVC 4c',43,54],['ALU/XLPE/SWA/PVC 3c',60,62],['ALU/XLPE/SWA/PVC 2c',68,70]]){
+    db[lbl]={};for(let i=s;i<=e;i++){const row=alu[i]||[];const size=sz(row[1]);if(!size)continue;db[lbl][size]=aluE(row);}
   }
 
   // FR cables
-  for(const[lbl,s,e]of[['CU/Mica/PVC-FR',5,20],['CU/Mica/XLPE/PVC-FR',26,45],['CU/Mica/XLPE/LSZH',49,68],['CU/Mica/XLPO-LSZH',72,91]]){
-    db[lbl]={};for(let i=s;i<=e&&i<fr.length;i++){const row=fr[i]||[];const size=sz(row[2]);if(!size)continue;db[lbl][size]=frE(row);}
+  for(const[lbl,s,e]of[['CU/Mica/PVC-FR',4,19],['CU/Mica/XLPE/PVC-FR',25,44],['CU/Mica/XLPE/LSZH',48,67],['CU/Mica/XLPO-LSZH',71,90]]){
+    db[lbl]={};for(let i=s;i<=e&&i<fr.length;i++){const row=fr[i]||[];const size=sz(row[1]);if(!size)continue;db[lbl][size]=frE(row);}
   }
 
   return {prices:db, csUSD};
@@ -1991,8 +2025,39 @@ window.importPrices=function(){
             if(m){const d=m[1];date=`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4,8)}`;}
             save('prices',{date,prices,csUSD});
             if(csUSD){const c=settings();c.csUSD=csUSD;saveCfg(c);}
+            // ── Immediately push to Firestore — don't wait for 2s debounce ──
+            // This ensures Firestore gets the complete CU+ALU+FR data right away,
+            // so the next _pullData on app open won't restore old CU-only prices.
+            clearTimeout(_syncTimer);
+            (async()=>{
+              const user=_auth.currentUser; if(!user) return;
+              try{
+                const fdata={};
+                _SYNC_KEYS.forEach(k=>{ try{const v=localStorage.getItem('dnf_'+k);if(v!==null)fdata[k]=JSON.parse(v);}catch{} });
+                await _db.collection('users').doc(user.uid).collection('data').doc('app').set(fdata);
+                console.log('[DNF] Prices force-pushed to Firestore');
+              }catch(e){ console.warn('[DNF] Force push failed:',e.message); }
+            })();
             renderCfg();
-            toast(`✅ ${count} cable types loaded from Excel (${date})${csUSD?' · CS: USD '+csUSD:''}`);
+            // ── Post-save verification: read BACK from localStorage ──
+            const saved=load('prices',{}).prices||{};
+            const cuSaved=Object.keys(saved['CU/PVC 1c']||{}).length;
+            const aluSaved=Object.keys(saved['ALU/PVC 1c']||{}).length;
+            const frSaved=Object.keys(saved['CU/Mica/PVC-FR']||{}).length;
+            const aluSample=saved['ALU/PVC 1c']?.['16mm²']?.['+0']??saved['ALU/PVC 1c']?.['16mm2']?.['+0']??null;
+            console.log('[DNF] Sheets:',wb.SheetNames.join(', '));
+            console.log('[DNF] Saved → CU:',cuSaved,'ALU:',aluSaved,'FR:',frSaved);
+            if(aluSaved===0&&frSaved===0){
+              const parsedAlu=Object.keys(prices['ALU/PVC 1c']||{}).length;
+              const parsedFr=Object.keys(prices['CU/Mica/PVC-FR']||{}).length;
+              if(parsedAlu>0||parsedFr>0){
+                toast(`⚠️ Storage save failed — parsed ALU:${parsedAlu} FR:${parsedFr} but stored 0. Try clearing app cache or use non-private browser.`,10000);
+              }else{
+                toast(`⚠️ ALU & FR not found in file. CU saved: ${cuSaved} sizes.`,6000);
+              }
+            }else{
+              toast(`✅ Prices saved — CU:${cuSaved} ALU:${aluSaved} FR:${frSaved} sizes${aluSample!=null?' | ALU 16mm²='+Number(aluSample).toFixed(4):''}`,6000);
+            }
           }catch(ex){toast('❌ Excel parse error: '+ex.message);}
         });
       }
