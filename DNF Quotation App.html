@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html><!-- v10 -->
+﻿<!DOCTYPE html><!-- v11 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -185,9 +185,41 @@ body.desktop #sheet{bottom:auto;top:50%;left:50%;right:auto;transform:translate(
 body.desktop #sheet.on{transform:translate(-50%,-50%);opacity:1}
 body.desktop #overlay{z-index:60}
 @media(prefers-color-scheme:dark){body.desktop #nav{border-right-color:#2d3748;background:#1a202c}body.desktop .nav-btn.on{background:rgba(100,140,200,.15);color:#90b4e8}}
+/* â”€â”€ Login overlay â”€â”€ */
+#login-overlay{position:fixed;inset:0;z-index:9999;background:#1a3a6b;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+#login-box{background:#fff;border-radius:12px;padding:36px 36px 28px;box-shadow:0 8px 32px rgba(0,0,0,.4);width:320px;max-width:92vw;text-align:center}
+.ln-logo{font-size:26pt;font-weight:bold;color:#1a237e;letter-spacing:3px;margin-bottom:2px}
+.ln-sub{font-size:8pt;color:#666;margin-bottom:24px}
+.ln-field{text-align:left;margin-bottom:14px}
+.ln-field label{display:block;font-size:8pt;font-weight:bold;color:#444;margin-bottom:5px}
+.ln-field input{width:100%;padding:11px 12px;border:1.5px solid #C7CDD4;border-radius:7px;font-size:10.5pt;box-sizing:border-box}
+.ln-field input:focus{outline:none;border-color:#1a3a6b}
+.ln-btn{width:100%;padding:13px;background:#1a3a6b;color:#fff;border:none;border-radius:7px;font-size:11pt;font-weight:bold;cursor:pointer;margin-top:4px}
+.ln-btn:active{background:#0d2a52}
+.ln-btn:disabled{opacity:.6;cursor:not-allowed}
+#ln-err{color:#c62828;font-size:8pt;min-height:16px;margin-bottom:6px;text-align:center}
 </style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
+<div id="login-overlay">
+  <div id="login-box">
+    <div class="ln-logo">DNF</div>
+    <div class="ln-sub">CABLE SDN BHD &mdash; Quotation System</div>
+    <div class="ln-field">
+      <label>Email</label>
+      <input type="email" id="ln-user" placeholder="your@email.com" autocomplete="username" autocapitalize="none" autocorrect="off">
+    </div>
+    <div class="ln-field">
+      <label>Password</label>
+      <input type="password" id="ln-pass" placeholder="Password" autocomplete="current-password">
+    </div>
+    <div id="ln-err"></div>
+    <button class="ln-btn" onclick="doLogin()">Login</button>
+  </div>
+</div>
 <div id="app">
   <header id="hdr">
     <h1 id="hdr-title">DNF Quotation</h1>
@@ -213,6 +245,105 @@ body.desktop #overlay{z-index:60}
 <div id="toast"></div>
 
 <script>
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  FIREBASE â€” Auth + Firestore Sync
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const _fbCfg = {
+  apiKey:            "AIzaSyBMIlLSNikY2OZ0K5jloWUq9tK5ye6xWfE",
+  authDomain:        "dnf-quotation.firebaseapp.com",
+  projectId:         "dnf-quotation",
+  storageBucket:     "dnf-quotation.firebasestorage.app",
+  messagingSenderId: "810991796332",
+  appId:             "1:810991796332:web:5323c497aae6f5892e1849"
+};
+firebase.initializeApp(_fbCfg);
+const _auth = firebase.auth();
+const _db   = firebase.firestore();
+const _SYNC_KEYS = ['custs','hist','cc','prices','cfg','userCableTypes','labelOverrides'];
+
+// â”€â”€ Pull Firestore â†’ localStorage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function _pullData(uid){
+  try{
+    const doc=await _db.collection('users').doc(uid).collection('data').doc('app').get();
+    if(doc.exists){
+      const d=doc.data();
+      _SYNC_KEYS.forEach(k=>{ if(d[k]!==undefined) localStorage.setItem('dnf_'+k,JSON.stringify(d[k])); });
+    }
+  }catch(e){ console.warn('Firestore pull failed:',e.message); }
+}
+
+// â”€â”€ Push localStorage â†’ Firestore (debounced 2s) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let _syncTimer=null;
+function scheduleSync(){
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(async function(){
+    const user=_auth.currentUser;
+    if(!user) return;
+    const data={};
+    _SYNC_KEYS.forEach(k=>{ try{ const v=localStorage.getItem('dnf_'+k); if(v!==null) data[k]=JSON.parse(v); }catch{} });
+    try{ await _db.collection('users').doc(user.uid).collection('data').doc('app').set(data); }
+    catch(e){ console.warn('Firestore push failed:',e.message); }
+  },2000);
+}
+
+// â”€â”€ Login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function doLogin(){
+  const email=(document.getElementById('ln-user').value||'').trim();
+  const pass=document.getElementById('ln-pass').value||'';
+  const errEl=document.getElementById('ln-err');
+  const btn=document.querySelector('.ln-btn');
+  errEl.textContent='';
+  btn.textContent='Logging in...';
+  btn.disabled=true;
+  try{
+    await _auth.signInWithEmailAndPassword(email,pass);
+  }catch(e){
+    const bad=['auth/user-not-found','auth/wrong-password','auth/invalid-credential','auth/invalid-email'];
+    errEl.textContent=bad.includes(e.code)?'Invalid email or password.':'Login failed. Check your connection.';
+    btn.textContent='Login';
+    btn.disabled=false;
+  }
+}
+
+// â”€â”€ Logout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function doLogout(){
+  if(!confirm('Log out?')) return;
+  _SYNC_KEYS.forEach(k=>localStorage.removeItem('dnf_'+k));
+  await _auth.signOut();
+  location.reload();
+}
+
+// â”€â”€ Apply session (show name + logout in header) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function _applySession(user){
+  const name=user.displayName||(user.email.split('@')[0].replace(/[._-]/g,' ').replace(/\b\w/g,c=>c.toUpperCase()));
+  try{ const c=settings(); c.salesman=name; saveCfg(c); }catch{}
+  const hr=document.getElementById('hdr-right');
+  if(hr) hr.innerHTML=
+    '<span style="font-size:9px;color:#ccc;margin-right:6px">'+name+'</span>'+
+    '<button onclick="doLogout()" style="padding:3px 10px;background:#546E7A;color:#fff;border:none;border-radius:3px;font-size:9px;cursor:pointer">Logout</button>';
+}
+
+// â”€â”€ Auth state listener (fires on every load) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+_auth.onAuthStateChanged(async function(user){
+  if(user){
+    await _pullData(user.uid);
+    document.getElementById('login-overlay').style.display='none';
+    _applySession(user);
+    if(typeof renderQuote==='function' && document.getElementById('main')) renderQuote();
+  }else{
+    document.getElementById('login-overlay').style.display='flex';
+    setTimeout(function(){ const el=document.getElementById('ln-user'); if(el) el.focus(); },150);
+  }
+});
+
+// â”€â”€ Enter key support on login form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+document.addEventListener('DOMContentLoaded',function(){
+  const lp=document.getElementById('ln-pass');
+  const lu=document.getElementById('ln-user');
+  if(lp) lp.addEventListener('keydown',function(e){ if(e.key==='Enter') doLogin(); });
+  if(lu) lu.addEventListener('keydown',function(e){ if(e.key==='Enter'){ lp.focus(); } });
+});
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // ══════════════════════════════════════════════════════════════
 //  DATA & CONSTANTS
 // ══════════════════════════════════════════════════════════════
@@ -310,7 +441,7 @@ function getGroups(){
 // ── Storage ──────────────────────────────────────────────────
 const K = k=>'dnf_'+k;
 const load = (k,d=[])=>{ try{const v=localStorage.getItem(K(k)); return v!==null?JSON.parse(v):d}catch{return d}};
-const save = (k,v)=>{ try{localStorage.setItem(K(k),JSON.stringify(v))}catch{} };
+const save = (k,v)=>{ try{localStorage.setItem(K(k),JSON.stringify(v));scheduleSync()}catch{} };
 const settings = ()=>load('cfg',{salesman:'Edwin Lim',sst:true});
 const saveCfg  = v=>save('cfg',v);
 

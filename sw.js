@@ -1,4 +1,4 @@
-﻿const CACHE = 'dnf-quote-v10';
+﻿const CACHE = 'dnf-quote-v11';
 const ASSETS = ['/', '/index.html', '/app.css', '/app.js', '/DNF Quotation App.html'];
 
 self.addEventListener('install', e => {
