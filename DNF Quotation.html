@@ -189,6 +189,12 @@
     .tnc-tbl td { border: 1px solid var(--border); padding: 3px 6px; vertical-align: top; }
     .tnc-k { background: var(--label); font-weight: bold; color: #444; width: 90px; white-space: nowrap; }
     .tnc-v { background: var(--row); line-height: 1.45; }
+    .tnc-inline-input {
+      border: none; border-bottom: 1px dashed #888; background: transparent;
+      font-family: Arial; font-size: 7pt; color: #1A1A1A; outline: none;
+      width: 60px; text-align: center; padding: 0 1px;
+    }
+    @media print { .tnc-inline-input { border-bottom: none; } }
     .closing {
       margin-top: 7px; padding: 7px;
       background: var(--row); border: 1px solid var(--border);
@@ -442,6 +448,14 @@
         <td class="tl" id="t_sstlbl">SST Amount (10%) :</td>
         <td class="tv" id="t_sst">RM 0.00</td>
       </tr>
+      <tr id="tr_trans_row">
+        <td class="tl">Transport Charge :</td>
+        <td class="tv" style="padding:2px 8px;">
+          <input type="number" id="f_transport" value="" min="0" step="0.01" placeholder="0.00"
+            oninput="calcTotals()"
+            style="border:none;background:transparent;text-align:right;width:100%;font-family:Arial;font-size:8.5pt;font-weight:bold;outline:none;color:#1A1A1A;">
+        </td>
+      </tr>
       <tr>
         <td class="tl grand">TOTAL PRICE :</td>
         <td class="tv grand" id="t_tot">RM 0.00</td>
@@ -459,7 +473,7 @@
       </tr>
       <tr>
         <td class="tnc-k">VALIDITY</td>
-        <td class="tnc-v">This quotation shall remain valid until 5:00 PM on the above-mentioned date. Notwithstanding the validity period stated herein, prices are subject to adjustment should the London Metal Exchange (LME) copper price exceed USD 13,850 per metric ton (MT) during the quotation validity period.</td>
+        <td class="tnc-v">This quotation shall remain valid until 5:00 PM on the above-mentioned date. Notwithstanding the validity period stated herein, prices are subject to adjustment should the London Metal Exchange (LME) copper price exceed USD <input class="tnc-inline-input" id="f_usd_lme" type="text" value="13,850"> per metric ton (MT) during the quotation validity period.</td>
       </tr>
       <tr>
         <td class="tnc-k">TERM</td>
@@ -779,10 +793,11 @@ function calcTotals() {
   });
   const pct = parseInt(document.getElementById('sst_opt').value);
   const sst = sub * pct / 100;
+  const trans = parseFloat(document.getElementById('f_transport').value) || 0;
   document.getElementById('t_sub').textContent    = fmtRM(sub);
   document.getElementById('t_sstlbl').textContent = pct > 0 ? `SST Amount (${pct}%) :` : 'SST Amount :';
   document.getElementById('t_sst').textContent    = fmtRM(sst);
-  document.getElementById('t_tot').textContent    = fmtRM(sub + sst);
+  document.getElementById('t_tot').textContent    = fmtRM(sub + sst + trans);
 }
 
 function fmtRM(n) {
@@ -1107,6 +1122,13 @@ function populateFromMobileApp(fromButton) {
   document.getElementById('f_val').value  = 'Standard Validity';
   document.getElementById('f_sp').value   = data.salesman  || '';
   document.getElementById('f_ref').value  = c.ref          || '';
+
+  // ── LME threshold ──
+  if (data.csUSD) document.getElementById('f_usd_lme').value = data.csUSD;
+
+  // ── Transport ──
+  const transAmt = parseFloat(data.transport) || 0;
+  document.getElementById('f_transport').value = transAmt > 0 ? transAmt.toFixed(2) : '';
 
   // ── SST ──
   document.getElementById('sst_opt').value = (data.sst !== false) ? '10' : '0';
