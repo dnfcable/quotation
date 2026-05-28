@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html><!-- v26 -->
+﻿<!DOCTYPE html><!-- v27 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -434,7 +434,7 @@ const CABLE_TYPES = {
   "ALU/XLPE/PVC 1c":        {label:"ALU/XLPE/PVC 1-Core",          cores:"1c"},
   "ALU/XLPE/SWA/PVC 2c":    {label:"ALU/XLPE/SWA/PVC 2-Core Arm.",cores:"2c"},
   "ALU/XLPE/SWA/PVC 3c":    {label:"ALU/XLPE/SWA/PVC 3-Core Arm.",cores:"3c"},
-  "ALU/XLPE/SWA/PVC 4c":    {label:"ALU/XLPE/SWA/PVC 4-Core Arm.",cores:"4c"},
+  "ALU/XLPE/SWA/PVC 4c":    {label:"ALU 4-Core Armoured",          cores:"4c"},
   "CU/Mica/PVC-FR":         {label:"CU/Mica/PVC FR",              cores:"1c"},
   "CU/Mica/XLPE/PVC-FR":    {label:"CU/Mica/XLPE/PVC FR",         cores:"1c"},
   "CU/Mica/XLPE/LSZH":      {label:"CU/Mica/XLPE/LSZH FR",        cores:"1c"},
@@ -452,6 +452,7 @@ const SIZES_MC  = ["5c","7c","9c","12c","19c","27c","37c"];
 const SIZES_NX  = ["1.5mm²","2.5mm²","4mm²","6mm²","10mm²","16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²"];
 const SIZES_ALU = ["16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²","500mm²","630mm²"];
 const SIZES_ALA = ["16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²"];
+const SIZES_ALA4= ["16mm² (PSP)","16mm²","25mm² (PSP)","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²"];
 const COLOURS   = ["","Black","Red","Yellow","Blue","Green","Brown","Grey","White","Orange","Green/Yellow"];
 const UNITS     = ["Meter","Coil","Drum","Roll","Set","Nos","Length"];
 const DRUM_PRICE = 150;
@@ -484,6 +485,7 @@ function sizesFor(cat){
   if(cat.includes("Multicore")) return SIZES_MC;
   if(["CU/XLPE/PVC 2c","CU/PVC/PVC 2c","CU/XLPE/PVC 3c","CU/PVC/PVC 3c","CU/XLPE/PVC 4c","CU/PVC/PVC 4c"].includes(cat)) return SIZES_NX;
   if(["ALU/PVC 1c","ALU/XLPE/PVC 1c"].includes(cat)) return SIZES_ALU;
+  if(cat==='ALU/XLPE/SWA/PVC 4c') return SIZES_ALA4;
   if(cat.startsWith("ALU/XLPE/SWA")) return SIZES_ALA;
   if(cat.includes("/Mica/")) return SIZES_1C;
   return SIZES_NX;
@@ -587,9 +589,10 @@ function renderQuote(){
     ST.items.forEach((it,i)=>{
       const cat=it.isCustom?it.customName:(()=>{
         if(it.category==='CU 4c Armoured') return `CU 4-Core ${_arm4cSpec(it.size||'')}`;
+        if(it.category==='ALU/XLPE/SWA/PVC 4c') return `ALU 4-Core ${(it.size||'').includes('(PSP)')?'PVC/PVC/SWA/PVC':'XLPE/PVC/SWA/PVC'}`;
         return getCableTypes()[it.category]?.label||it.category||'';
       })();
-      const desc=it.isCustom?it.customName:(it.size||'')+(it.colour?` (${it.colour})`:'');
+      const desc=it.isCustom?it.customName:(buildDesc(it)+(it.colour?` (${it.colour})`:''));
       const amt=(it.price||0)*(it.qty||0);
       const scls=it.stock==='exstock'?'s-yes':it.stock==='no stock'?'s-no':'s-na';
       const stxt=it.stock==='exstock'?'✅ In stock':it.stock==='no stock'?'❌ No stock':'—';
@@ -698,7 +701,8 @@ function buildMsg(){
     const unit=it.unit==='Meter'?'mtr':(it.unit||'').toLowerCase();
     const drum=it.drum?'(D)':'';
     const desc=it.waDesc||(it.isCustom?it.customName:buildDesc(it));
-    lines.push(`${desc} - ${+it.qty}${unit}${pfx?' '+pfx:''}`);
+    const colSfx=(!it.isCustom&&it.colour)?` (${it.colour})`:'';
+    lines.push(`${desc}${colSfx} - ${+it.qty}${unit}${pfx?' '+pfx:''}`);
     if(it.remarks) lines.push(it.remarks);
     lines.push(`RM${(+it.price).toFixed(2)}/${unit}${drum}`);
     lines.push('');
@@ -714,9 +718,9 @@ function buildMsg(){
 }
 // Determine PVC/SWA/PVC vs XLPE/SWA/PVC for 4c armoured sizes
 function _arm4cSpec(sizeKey){
-  if((sizeKey||'').includes('(PSP)')) return 'PVC/SWA/PVC';
+  if((sizeKey||'').includes('(PSP)')) return 'PVC/PVC/SWA/PVC';
   const m=(sizeKey||'').match(/^[\d.]+/);
-  if(m && parseFloat(m[0])<=10) return 'PVC/SWA/PVC';
+  if(m && parseFloat(m[0])<=10) return 'PVC/PVC/SWA/PVC';
   return 'XLPE/SWA/PVC';
 }
 // CU/PVC 1c price conversion.
@@ -751,6 +755,10 @@ function buildDesc(it){
   if(cat==='CU 4c Armoured'){
     const spec=_arm4cSpec(rawSize);
     return `${s} x 4c CU/${spec}`;
+  }
+  if(cat==='ALU/XLPE/SWA/PVC 4c'){
+    const spec=rawSize.includes('(PSP)')?'PVC/PVC/SWA/PVC':'XLPE/PVC/SWA/PVC';
+    return `${s} x 4c AL/${spec}`;
   }
   // Non-armoured: category key already encodes spec (CU/XLPE/PVC or CU/PVC/PVC)
   // Just strip the trailing "Xc" → e.g. "CU/XLPE/PVC 4c" → "CU/XLPE/PVC"
@@ -830,7 +838,7 @@ const TNC=[
     'ALU/XLPE/PVC 1c':        {cn:'AL/',      ins:'XLPE/PVC',         rt:'0.6/1kV', st:'Power Cable compliant with MS2104/IEC60502-1'},
     'ALU/XLPE/SWA/PVC 2c':    {cn:'AL/',      ins:'XLPE/PVC/SWA/PVC', rt:'0.6/1kV', st:'Power Cable compliant with MS2107/IEC60502-1'},
     'ALU/XLPE/SWA/PVC 3c':    {cn:'AL/',      ins:'XLPE/PVC/SWA/PVC', rt:'0.6/1kV', st:'Power Cable compliant with MS2107/IEC60502-1'},
-    'ALU/XLPE/SWA/PVC 4c':    {cn:'AL/',      ins:'XLPE/PVC/SWA/PVC', rt:'0.6/1kV', st:'Power Cable compliant with MS2107/IEC60502-1'},
+    'ALU/XLPE/SWA/PVC 4c':    {cn:'AL/',      ins:'XLPE/PVC/SWA/PVC', rt:'0.6/1kV', st:'Power Cable compliant with MS2107/IEC60502-1', dynIns:true},
     'CU/Mica/PVC-FR':         {cn:'CU/MICA/',ins:'XLPE/PVC-FR',       rt:'450/750V', st:''},
     'CU/Mica/XLPE/PVC-FR':    {cn:'CU/MICA/',ins:'XLPE/PVC-FR',       rt:'0.6/1kV', st:'Power Cable compliant with MS2104/IEC60502-1/IEC60332-3-22/BS6387'},
     'CU/Mica/XLPE/LSZH':      {cn:'CU/MICA/',ins:'XLPE/LSZH',         rt:'0.6/1kV', st:'Power Cable compliant with MS2104/IEC60502-1/IEC60332-3-22/BS6387'},
@@ -844,12 +852,14 @@ const TNC=[
     const cc=String(it.category||'').match(/\b(\d+)c\s*$/i);
     const mc=String(it.size||'').match(/^(\d+)c$/i);
     const core=cm.coreFromSize?(mc?'x '+mc[1]+' Core':''):(cc?'x '+cc[1]+' Core':'');
-    let st=cm.st||'';
-    if(cm.dynSt){const r=String(it.size||'');const ps=r.indexOf('PSP')!==-1;const sm=r.match(/^([\d.]+)/);const sn=sm?parseFloat(sm[1]):999;st=(ps||sn<=10)?'Power Cable compliant with MS2103/IEC60502-1':'Power Cable compliant with MS2107/IEC60502-1';}
+    let st=cm.st||''; let ins=cm.ins||'';
+    if(cm.dynSt){const r=String(it.size||'');const ps=r.indexOf('PSP')!==-1;const sm=r.match(/^([\d.]+)/);const sn=sm?parseFloat(sm[1]):999;st=(ps||sn<=10)?'Power Cable compliant with MS2103/IEC60502-1':'Power Cable compliant with MS2107/IEC60502-1';ins=(ps||sn<=10)?'PVC/PVC/SWA/PVC':'XLPE/PVC/SWA/PVC';}
+    if(cm.dynIns){const r=String(it.size||'');ins=r.indexOf('(PSP)')!==-1?'PVC/PVC/SWA/PVC':cm.ins;}
     const parts=[sz];
     if(core)parts.push(core);
     if(cm.rt)parts.push(cm.rt);
-    if(cm.cn||cm.ins)parts.push(cm.cn+cm.ins);
+    if(cm.cn||ins)parts.push(cm.cn+ins);
+    if(!it.isCustom&&it.colour)parts.push(`(${it.colour})`);
     if(st)parts.push(st);
     let d=parts.join(' ');
     if(it.remarks)d+=' ('+it.remarks+')';
@@ -1976,8 +1986,16 @@ function parseExcelPrices(wb){
     db[xp]={...d};db[pp]={...d};
   }
 
-  // Aluminium
-  for(const[lbl,s,e]of[['ALU/PVC 1c',5,18],['ALU/XLPE/PVC 1c',24,37],['ALU/XLPE/SWA/PVC 4c',43,54],['ALU/XLPE/SWA/PVC 3c',60,62],['ALU/XLPE/SWA/PVC 2c',68,70]]){
+  // Aluminium — 4c armoured with PSP detection (same pattern as CU 4c)
+  {const aPsp={},aXsp={};let aPrev=null;
+  for(let i=43;i<=54;i++){const row=alu[i]||[];const size=sz(row[1]);if(!size)continue;const entry=aluE(row);
+    if(size==='P S P'||size.toUpperCase()==='PSP'){aPsp[aPrev?`${aPrev} (PSP)`:'PSP']=entry;}
+    else{aPrev=size;aXsp[size]=entry;}}
+  db['ALU/XLPE/SWA/PVC 4c']={};
+  for(const[s2,e2]of Object.entries(aPsp)){db['ALU/XLPE/SWA/PVC 4c'][s2]=e2;}
+  for(const[baseSz,xspE]of Object.entries(aXsp)){const pk=`${baseSz} (PSP)`;if(aPsp[pk])db['ALU/XLPE/SWA/PVC 4c'][pk]=aPsp[pk];db['ALU/XLPE/SWA/PVC 4c'][baseSz]=xspE;}}
+  // Remaining ALU sections (no PSP rows)
+  for(const[lbl,s,e]of[['ALU/PVC 1c',5,18],['ALU/XLPE/PVC 1c',24,37],['ALU/XLPE/SWA/PVC 3c',60,62],['ALU/XLPE/SWA/PVC 2c',68,70]]){
     db[lbl]={};for(let i=s;i<=e;i++){const row=alu[i]||[];const size=sz(row[1]);if(!size)continue;db[lbl][size]=aluE(row);}
   }
 
