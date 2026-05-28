@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html><!-- v13 -->
+﻿<!DOCTYPE html><!-- v21 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -782,7 +782,7 @@ function buildMobileQuotationHTML(data){
   function fmtRM(n){return 'RM '+n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
 const TNC=[
     ["NOTE","Prices quoted are applicable for the packaged offer only. In the event of any discrepancy between this quotation and the Customer's Purchase Order (PO), the terms and conditions stated in this quotation shall prevail unless otherwise mutually agreed in writing. Ex-stock items are subject to availability on a first-come, first-served basis."],
-    ["VALIDITY","This quotation shall remain valid until 5:00 PM on the above-mentioned date. Notwithstanding the validity period stated herein, prices are subject to adjustment should the London Metal Exchange (LME) copper price exceed USD 13,850 per metric ton (MT) during the quotation validity period."],
+    ["VALIDITY",`This quotation shall remain valid until 5:00 PM on the above-mentioned date. Notwithstanding the validity period stated herein, prices are subject to adjustment should the London Metal Exchange (LME) copper price exceed USD ${data.csUSD||'13,850'} per metric ton (MT) during the quotation validity period.`],
     ["TERM","Payment shall be made in full and cleared prior to delivery. All banking and related charges shall be borne solely by the Customer. A draft copy of the Letter of Credit (LC) shall be submitted to us for review and comments prior to issuance through the bank, subject to mutual agreement by both parties. Any overdue outstanding amounts must be fully settled before commencement of any subsequent deliveries."],
     ["INTEREST","Interest at the rate of 1.5% per month shall be charged on all overdue outstanding amounts until full settlement is received."],
     ["TAX (SST)","All prices quoted are subject to 10% Sales and Service Tax (SST), where applicable, and shall be treated as included or excluded based on the quotation summary stated herein."],
@@ -873,7 +873,6 @@ function openMobileQuotation(data){
     const url=URL.createObjectURL(blob);
     const w=window.open(url,'_blank');
     if(!w){
-      // Popup blocked — show the quotation inline in a full-screen overlay instead
       const ov=document.createElement('div');
       ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#fff;overflow:auto;';
       ov.innerHTML='<div style="display:flex;gap:8px;padding:10px;background:#1a3a6b;position:sticky;top:0;z-index:1">'
@@ -885,7 +884,7 @@ function openMobileQuotation(data){
       toast('Quotation ready — use Print to save as PDF');
     }else{
       setTimeout(()=>URL.revokeObjectURL(url),60000);
-      toast('Quotation ready ✓');
+      toast('Quotation opened — close that tab to come back and edit');
     }
   }catch(e){toast('Error: '+e.message);}
 }
@@ -893,34 +892,35 @@ function openMobileQuotation(data){
 function generateQuotation(){
   if(!ST.items.length){toast('Add items first');return;}
   const cfg=settings();
+  const _pdb=load('prices',{});
   const data={
     ref:      ST.ref,
     date:     ST.date,
     salesman: cfg.salesman||'',
     sst:      ST.sst!==false,
     transport:ST.transport||0,
+    csUSD:    cfg.csUSD||_pdb.csUSD||'',
     customer: ST.customer||{},
     items:    ST.items
   };
-  // When running from a website (GitHub Pages, Synology, etc.) open hosted DNF Quotation.html
+  // Web (GitHub Pages / Synology): open hosted DNF Quotation.html; fall back if popup blocked
   const isWeb=location.protocol==='https:'||location.protocol==='http:';
   if(isWeb){
     const hash='#dnfq='+encodeURIComponent(JSON.stringify(data));
     const w=window.open('DNF%20Quotation.html'+hash,'_blank');
-    if(!w) openMobileQuotation(data); // fallback if popup blocked
+    if(!w) openMobileQuotation(data);
     return;
   }
-  // Local file: mobile → built-in, desktop → external file
+  // Local — mobile: built-in renderer; desktop: external DNF Quotation.html
   const cfgPath=load('cfg',{}).quotationPath||'';
   if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)){
     if(!cfgPath||cfgPath.startsWith('file://')){ openMobileQuotation(data); return; }
   }
-  // Desktop local only: open DNF Quotation.html via configured path
   const hash='#dnfq='+encodeURIComponent(JSON.stringify(data));
   const quotePath=(cfgPath||'file:///C:/Users/edwin/Downloads/DNF%20Quotation.html')+hash;
   const w=window.open(quotePath,'_blank');
   if(!w){
-    toast('Pop-up blocked. Open DNF Quotation.html then click \u{1F4F1} Load from App');
+    toast('Pop-up blocked. Open DNF Quotation.html then click 📱 Load from App');
     localStorage.setItem('dnf_pending_quote',JSON.stringify(data));
   }else{
     toast('Opening DNF Quotation.html…');
@@ -1686,9 +1686,19 @@ function renderCfg(){
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
             <div class="srow-lbl">${pLoaded?'✅ Price file loaded':'❌ No price file'}</div>
-            <div class="srow-sub">${pLoaded?`Date: ${pdb.date||'Unknown'} · ${Object.keys(pdb.prices).length} cable types`:'Import to auto-fill prices when adding items'}</div>
+            <div class="srow-sub">${pLoaded?`Date: ${pdb.date||'Unknown'} · ${Object.keys(pdb.prices).length} cable types${pdb.csUSD?' · CS: USD '+pdb.csUSD:''}`:'Import to auto-fill prices when adding items'}</div>
           </div>
           ${pLoaded?`<button class="btn btn-sm btn-red" onclick="clearPrices()">Clear</button>`:''}
+        </div>
+        <div class="srow" style="border-top:1px solid #edf2f7;padding-top:8px;align-items:center">
+          <div>
+            <div class="srow-lbl">LME Threshold (USD/MT)</div>
+            <div class="srow-sub">Shown in T&amp;C Validity clause — auto-filled from price file</div>
+          </div>
+          <input class="inp" id="cfg-lme-usd" type="text" inputmode="numeric"
+            value="${esc(cfg.csUSD||pdb.csUSD||'')}" placeholder="e.g. 13,850"
+            style="width:110px;text-align:right;font-size:14px"
+            onchange="saveCSUSD(this.value.trim())">
         </div>
         <button class="btn btn-navy btn-full" onclick="importPrices()" style="font-size:15px">
           📂 Import Price File  <span style="font-size:12px;opacity:.8">(.xlsx or .json)</span>
@@ -1868,6 +1878,18 @@ function parseExcelPrices(wb){
   const sz=v=>{if(v===null||v===undefined)return null;const s=String(v).trim();return(!s||s.toLowerCase()==='nan')?null:s};
   const getRows=name=>{const ws=wb.Sheets[name];return ws?XLSX.utils.sheet_to_json(ws,{header:1,defval:null}):[]};
 
+  // Read CS price from Masterlist cell Q4 (row 4, column Q = 17th col)
+  let csUSD='';
+  try{
+    const mlSheet=wb.Sheets['Masterlist'];
+    if(mlSheet){
+      const cell=mlSheet['Q4'];          // direct cell reference — most reliable
+      const raw=cell?(cell.v??cell.w):null; // .v = computed value, .w = formatted string
+      const n=parseFloat(raw);
+      if(!isNaN(n)&&n>0) csUSD=Number(n).toLocaleString('en-MY',{minimumFractionDigits:0,maximumFractionDigits:0});
+    }
+  }catch(e){}
+
   const CU ={'+3':6,'+2':8,'+1':10,'+0':12,'-1':14,'-2':16,'Below 100m':18,'Below 50m':20};
   const ALU={'+3':5,'+2':7,'+1':9,'+0':11,'-1':13,'-2':15,'-3':17,'Below 200m':19,'Below 100m':21};
   const FR ={'+3':4,'+2':6,'+1':8,'+0':10,'-1':12,'-2':14};
@@ -1930,7 +1952,7 @@ function parseExcelPrices(wb){
     db[lbl]={};for(let i=s;i<=e&&i<fr.length;i++){const row=fr[i]||[];const size=sz(row[2]);if(!size)continue;db[lbl][size]=frE(row);}
   }
 
-  return db;
+  return {prices:db, csUSD};
 }
 
 window.importPrices=function(){
@@ -1946,10 +1968,12 @@ window.importPrices=function(){
         // JSON path
         try{
           const d=JSON.parse(ev.target.result);
-          const prices=d.prices||d; const date=d.date||today();
+          const prices=d.prices||d; const date=d.date||today(); const csUSD=d.csUSD||'';
           const count=Object.keys(prices).length;
           if(!count){toast('No price data found in file');return;}
-          save('prices',{date,prices}); renderCfg();
+          save('prices',{date,prices,csUSD});
+          if(csUSD){const c=settings();c.csUSD=csUSD;saveCfg(c);}
+          renderCfg();
           toast(`✅ ${count} cable types loaded (${date})`);
         }catch{toast('Invalid file');}
       } else {
@@ -1958,14 +1982,17 @@ window.importPrices=function(){
           try{
             const data=new Uint8Array(ev.target.result);
             const wb=XLSX.read(data,{type:'array'});
-            const prices=parseExcelPrices(wb);
+            const result=parseExcelPrices(wb);
+            const prices=result.prices; const csUSD=result.csUSD||'';
             const count=Object.keys(prices).length;
             if(!count){toast('❌ No prices found — is this the correct Sales Daily Price file?');return;}
             const m=f.name.match(/(\d{8})/);
             let date=today();
             if(m){const d=m[1];date=`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4,8)}`;}
-            save('prices',{date,prices}); renderCfg();
-            toast(`✅ ${count} cable types loaded from Excel (${date})`);
+            save('prices',{date,prices,csUSD});
+            if(csUSD){const c=settings();c.csUSD=csUSD;saveCfg(c);}
+            renderCfg();
+            toast(`✅ ${count} cable types loaded from Excel (${date})${csUSD?' · CS: USD '+csUSD:''}`);
           }catch(ex){toast('❌ Excel parse error: '+ex.message);}
         });
       }
@@ -2003,6 +2030,7 @@ window.testServerUrl=async function(){
 };
 window.saveName=function(v){ const c=settings(); c.salesman=v.trim(); saveCfg(c); toast('Saved ✓'); }
 window.saveSst=function(v){ const c=settings(); c.sst=v; saveCfg(c); toast(v?'SST enabled':'SST disabled'); }
+window.saveCSUSD=function(v){ const c=settings(); c.csUSD=v; saveCfg(c); toast('LME threshold saved ✓'); }
 window.saveMarkupDefault=function(v){ const c=settings(); c.markup=parseFloat(v)||0; saveCfg(c); toast(c.markup>0?`Default markup set to ${c.markup}%`:'Default markup cleared'); };
 window.saveWaFooter=function(v){
   const c=settings(); c.waFooter=v; saveCfg(c);
@@ -2213,11 +2241,13 @@ async function generatePDFApp(){
   if(btn){btn.textContent='⏳';btn.disabled=true;}
 
   const cfg=settings();
+  const _pdb2=load('prices',{});
   const data={
     ref:ST.ref, date:ST.date,
     salesman:cfg.salesman||'',
     sst:ST.sst!==false,
     transport:ST.transport||0,
+    csUSD:cfg.csUSD||_pdb2.csUSD||'',
     customer:ST.customer||{},
     items:ST.items
   };
