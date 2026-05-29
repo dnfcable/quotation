@@ -448,14 +448,6 @@
         <td class="tl" id="t_sstlbl">SST Amount (10%) :</td>
         <td class="tv" id="t_sst">RM 0.00</td>
       </tr>
-      <tr id="tr_trans_row">
-        <td class="tl">Transport Charge :</td>
-        <td class="tv" style="padding:2px 8px;">
-          <input type="number" id="f_transport" value="" min="0" step="0.01" placeholder="0.00"
-            oninput="calcTotals()"
-            style="border:none;background:transparent;text-align:right;width:100%;font-family:Arial;font-size:8.5pt;font-weight:bold;outline:none;color:#1A1A1A;">
-        </td>
-      </tr>
       <tr>
         <td class="tl grand">TOTAL PRICE :</td>
         <td class="tv grand" id="t_tot">RM 0.00</td>
@@ -648,7 +640,7 @@ const INSULATIONS = [
 ];
 const STANDARDS = [
   '',
-  'Power Cable compliant with MS2112/IEC60227 (100m)',
+  'Power Cable compliant with MS2112/IEC60227',
   'Power Cable compliant with MS2112/IEC60227',
   'Power Cable compliant with MS2102/IEC60502-1',
   'Power Cable compliant with MS2103/IEC60502-1',
@@ -663,7 +655,7 @@ const STANDARDS = [
   'Power Cable compliant with MS2106/IEC60502-1/IEC60332-3-22/BS6387',
   'Power Cable compliant with MS2107/IEC60502-1/IEC60332-3-22/BS6387'
 ];
-const UOMS = ['meter','Coil'];
+const UOMS = ['meter','Coil','lot'];
 
 let uid = 0;
 
@@ -729,6 +721,7 @@ function addRow() {
       <select class="stsel" onchange="buildDesc(${id})" style="width:100%;font-family:Arial;font-size:7pt;border:none;background:transparent;outline:none;">
         ${STANDARDS.map(s=>`<option value="${s}">${s||'—'}</option>`).join('')}
       </select>
+      <input type="hidden" class="colinp" value="">
     </td>
     <td class="np no-print" style="text-align:center;">
       <button onclick="delRow(this)"
@@ -761,6 +754,7 @@ function buildDesc(id) {
   const rt  = tr.querySelector('.rsel').value;
   const cn  = tr.querySelector('.cnsel').value;
   const ins = tr.querySelector('.insel').value;
+  const col = (tr.querySelector('.colinp') || {value:''}).value.trim();
   const std = tr.querySelector('.stsel').value;
 
   let desc = '';
@@ -769,6 +763,7 @@ function buildDesc(id) {
     if (co)        parts.push(co.trim());
     if (rt)        parts.push(rt.trim());
     if (cn || ins) parts.push((cn + ins).trim());
+    if (col)       parts.push('(' + col + ')');
     if (std)       parts.push(std.trim());
     desc = parts.join(' ');
   }
@@ -785,15 +780,15 @@ function calcRow(id) {
 }
 
 function calcTotals() {
-  let sub = 0;
+  let sub = 0, trans = 0;
   document.querySelectorAll('#itbody tr').forEach(tr => {
     const q = parseFloat(tr.querySelector('.qinp').value) || 0;
     const p = parseFloat(tr.querySelector('.pinp').value) || 0;
-    sub += q * p;
+    if (tr.dataset.transport === 'true') { trans += q * p; }
+    else { sub += q * p; }
   });
   const pct = parseInt(document.getElementById('sst_opt').value);
   const sst = sub * pct / 100;
-  const trans = parseFloat(document.getElementById('f_transport').value) || 0;
   document.getElementById('t_sub').textContent    = fmtRM(sub);
   document.getElementById('t_sstlbl').textContent = pct > 0 ? `SST Amount (${pct}%) :` : 'SST Amount :';
   document.getElementById('t_sst').textContent    = fmtRM(sst);
@@ -1126,10 +1121,6 @@ function populateFromMobileApp(fromButton) {
   // ── LME threshold ──
   if (data.csUSD) document.getElementById('f_usd_lme').value = data.csUSD;
 
-  // ── Transport ──
-  const transAmt = parseFloat(data.transport) || 0;
-  document.getElementById('f_transport').value = transAmt > 0 ? transAmt.toFixed(2) : '';
-
   // ── SST ──
   document.getElementById('sst_opt').value = (data.sst !== false) ? '10' : '0';
 
@@ -1164,7 +1155,7 @@ function populateFromMobileApp(fromButton) {
 
     // ── Fill 6 description dropdowns for standard cable types ──
     var CAT_MAP = {
-      'CU/PVC 1c':              {cn:'CU/',      ins:'PVC Insulated',     rt:'450/750V', st:'Power Cable compliant with MS2112/IEC60227 (100m)'},
+      'CU/PVC 1c':              {cn:'CU/',      ins:'PVC Insulated',     rt:'450/750V', st:'Power Cable compliant with MS2112/IEC60227'},
       'CU/XLPE/PVC 1c':         {cn:'CU/',      ins:'XLPE/PVC',          rt:'0.6/1kV',  st:'Power Cable compliant with MS2104/IEC60502-1'},
       'CU/XLPE/PVC 2c':         {cn:'CU/',      ins:'XLPE/PVC',          rt:'0.6/1kV',  st:'Power Cable compliant with MS2106/IEC60502-1'},
       'CU/PVC/PVC 2c':          {cn:'CU/',      ins:'PVC/PVC',           rt:'0.6/1kV', st:'Power Cable compliant with MS2102/IEC60502-1'},
@@ -1177,7 +1168,7 @@ function populateFromMobileApp(fromButton) {
       'CU/PVC/SWA/PVC 3c':      {cn:'CU/',      ins:'PVC/PVC/SWA/PVC',   rt:'0.6/1kV',  st:'Power Cable compliant with MS2103/IEC60502-1'},
       'CU Arm Multicore 1.5mm²':{cn:'CU/', ins:'XLPE/PVC/SWA/PVC',  rt:'0.6/1kV',  st:'Power Cable compliant with MS2103/IEC60502-1', fixedSize:'DNF 1.5mm²', coreFromSize:true},
       'CU Arm Multicore 2.5mm²':{cn:'CU/', ins:'XLPE/PVC/SWA/PVC',  rt:'0.6/1kV',  st:'Power Cable compliant with MS2103/IEC60502-1', fixedSize:'DNF 2.5mm²', coreFromSize:true},
-      'ALU/PVC 1c':             {cn:'AL/',      ins:'PVC Insulated',     rt:'450/750V', st:'Power Cable compliant with MS2112/IEC60227 (100m)'},
+      'ALU/PVC 1c':             {cn:'AL/',      ins:'PVC Insulated',     rt:'450/750V', st:'Power Cable compliant with MS2112/IEC60227'},
       'ALU/XLPE/PVC 1c':        {cn:'AL/',      ins:'XLPE/PVC',          rt:'0.6/1kV',  st:'Power Cable compliant with MS2104/IEC60502-1'},
       'ALU/XLPE/SWA/PVC 2c':    {cn:'AL/',      ins:'XLPE/PVC/SWA/PVC',  rt:'0.6/1kV',  st:'Power Cable compliant with MS2107/IEC60502-1'},
       'ALU/XLPE/SWA/PVC 3c':    {cn:'AL/',      ins:'XLPE/PVC/SWA/PVC',  rt:'0.6/1kV',  st:'Power Cable compliant with MS2107/IEC60502-1'},
@@ -1209,20 +1200,26 @@ function populateFromMobileApp(fromButton) {
         }
         cselEl.value = coreLabel;
       }
-      // Rating, Conductor, Insulation, Standard
-      var rselEl  = tr.querySelector('.rsel');  if (rselEl)  rselEl.value  = cm.rt;
-      var cnselEl = tr.querySelector('.cnsel'); if (cnselEl) cnselEl.value = cm.cn;
-      var inselEl = tr.querySelector('.insel'); if (inselEl) inselEl.value = cm.ins;
-      var stselEl = tr.querySelector('.stsel'); if (stselEl) stselEl.value = cm.st;
-      // CU 4c Armoured: standard depends on size (≤10mm² or PSP → MS2103, else → MS2107)
-      if (it.category === 'CU 4c Armoured' && stselEl) {
+      // Rating, Conductor, Insulation, Standard, Colour
+      var rselEl   = tr.querySelector('.rsel');   if (rselEl)   rselEl.value   = cm.rt;
+      var cnselEl  = tr.querySelector('.cnsel');  if (cnselEl)  cnselEl.value  = cm.cn;
+      var inselEl  = tr.querySelector('.insel');  if (inselEl)  inselEl.value  = cm.ins;
+      var stselEl  = tr.querySelector('.stsel');  if (stselEl)  stselEl.value  = cm.st;
+      var colinpEl = tr.querySelector('.colinp'); if (colinpEl) colinpEl.value = it.colour || '';
+      // CU 4c Armoured: standard AND insulation depend on size (≤10mm² or PSP → PVC/PVC/SWA/PVC + MS2103)
+      if (it.category === 'CU 4c Armoured') {
         var rawSz4 = String(it.size || '');
         var isPSP4 = rawSz4.indexOf('PSP') !== -1;
         var szM4   = rawSz4.match(/^([\d.]+)/);
         var szN4   = szM4 ? parseFloat(szM4[1]) : 999;
-        stselEl.value = (isPSP4 || szN4 <= 10)
+        if (stselEl) stselEl.value = (isPSP4 || szN4 <= 10)
           ? 'Power Cable compliant with MS2103/IEC60502-1'
           : 'Power Cable compliant with MS2107/IEC60502-1';
+        if (inselEl && (isPSP4 || szN4 <= 10)) inselEl.value = 'PVC/PVC/SWA/PVC';
+      }
+      // ALU 4c Armoured: insulation depends on PSP
+      if (it.category === 'ALU/XLPE/SWA/PVC 4c' && inselEl) {
+        if (String(it.size || '').indexOf('(PSP)') !== -1) inselEl.value = 'PVC/PVC/SWA/PVC';
       }
       // Build description from dropdowns, then append remarks/drum tag
       buildDesc(id);
@@ -1252,6 +1249,25 @@ function populateFromMobileApp(fromButton) {
       if (dqinp) dqinp.value = drumCount;
       if (dpinp) dpinp.value = '150.00';
       calcRow(did);
+    }
+  }
+
+  // ── Transport charge row ──
+  var transAmt = parseFloat(data.transport) || 0;
+  if (transAmt > 0) {
+    addRow();
+    var tid = uid;
+    var ttr = document.querySelector('[data-uid="' + tid + '"]');
+    if (ttr) {
+      ttr.dataset.transport = 'true';
+      document.getElementById('d' + tid).textContent = 'Transport Charge';
+      var tuomSel = ttr.querySelector('select');
+      if (tuomSel) tuomSel.value = 'lot';
+      var tqinp = ttr.querySelector('.qinp');
+      var tpinp = ttr.querySelector('.pinp');
+      if (tqinp) tqinp.value = 1;
+      if (tpinp) tpinp.value = transAmt.toFixed(2);
+      calcRow(tid);
     }
   }
 
