@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html><!-- v27 -->
+﻿<!DOCTYPE html><!-- v21 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -267,23 +267,7 @@ async function _pullData(uid){
     const doc=await _db.collection('users').doc(uid).collection('data').doc('app').get();
     if(doc.exists){
       const d=doc.data();
-      // Helper: parse DD/MM/YYYY → sortable integer (e.g. 20260528)
-      const parseDMY=s=>{const p=(s||'').split('/');return p.length===3?parseInt(p[2])*10000+parseInt(p[1])*100+parseInt(p[0]):0;};
-      _SYNC_KEYS.forEach(k=>{
-        if(d[k]===undefined) return;
-        // Prices: only overwrite local if Firestore date is strictly newer.
-        // This prevents old/incomplete Firestore data from clobbering a
-        // freshly-imported price file that now contains correct ALU/FR prices.
-        if(k==='prices'){
-          const localDate=(load('prices',{}).date)||'';
-          const remoteDate=(d[k]&&d[k].date)||'';
-          if(localDate && parseDMY(localDate)>=parseDMY(remoteDate)){
-            console.log(`[DNF] Local prices (${localDate}) >= Firestore (${remoteDate}) -- keeping local`);
-            return;
-          }
-        }
-        localStorage.setItem('dnf_'+k,JSON.stringify(d[k]));
-      });
+      _SYNC_KEYS.forEach(k=>{ if(d[k]!==undefined) localStorage.setItem('dnf_'+k,JSON.stringify(d[k])); });
     }
   }catch(e){ console.warn('Firestore pull failed:',e.message); }
 }
@@ -434,7 +418,7 @@ const CABLE_TYPES = {
   "ALU/XLPE/PVC 1c":        {label:"ALU/XLPE/PVC 1-Core",          cores:"1c"},
   "ALU/XLPE/SWA/PVC 2c":    {label:"ALU/XLPE/SWA/PVC 2-Core Arm.",cores:"2c"},
   "ALU/XLPE/SWA/PVC 3c":    {label:"ALU/XLPE/SWA/PVC 3-Core Arm.",cores:"3c"},
-  "ALU/XLPE/SWA/PVC 4c":    {label:"ALU 4-Core Armoured",          cores:"4c"},
+  "ALU/XLPE/SWA/PVC 4c":    {label:"ALU/XLPE/SWA/PVC 4-Core Arm.",cores:"4c"},
   "CU/Mica/PVC-FR":         {label:"CU/Mica/PVC FR",              cores:"1c"},
   "CU/Mica/XLPE/PVC-FR":    {label:"CU/Mica/XLPE/PVC FR",         cores:"1c"},
   "CU/Mica/XLPE/LSZH":      {label:"CU/Mica/XLPE/LSZH FR",        cores:"1c"},
@@ -452,7 +436,6 @@ const SIZES_MC  = ["5c","7c","9c","12c","19c","27c","37c"];
 const SIZES_NX  = ["1.5mm²","2.5mm²","4mm²","6mm²","10mm²","16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²"];
 const SIZES_ALU = ["16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²","500mm²","630mm²"];
 const SIZES_ALA = ["16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²"];
-const SIZES_ALA4= ["16mm² (PSP)","16mm²","25mm² (PSP)","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²"];
 const COLOURS   = ["","Black","Red","Yellow","Blue","Green","Brown","Grey","White","Orange","Green/Yellow"];
 const UNITS     = ["Meter","Coil","Drum","Roll","Set","Nos","Length"];
 const DRUM_PRICE = 150;
@@ -485,7 +468,6 @@ function sizesFor(cat){
   if(cat.includes("Multicore")) return SIZES_MC;
   if(["CU/XLPE/PVC 2c","CU/PVC/PVC 2c","CU/XLPE/PVC 3c","CU/PVC/PVC 3c","CU/XLPE/PVC 4c","CU/PVC/PVC 4c"].includes(cat)) return SIZES_NX;
   if(["ALU/PVC 1c","ALU/XLPE/PVC 1c"].includes(cat)) return SIZES_ALU;
-  if(cat==='ALU/XLPE/SWA/PVC 4c') return SIZES_ALA4;
   if(cat.startsWith("ALU/XLPE/SWA")) return SIZES_ALA;
   if(cat.includes("/Mica/")) return SIZES_1C;
   return SIZES_NX;
@@ -589,10 +571,9 @@ function renderQuote(){
     ST.items.forEach((it,i)=>{
       const cat=it.isCustom?it.customName:(()=>{
         if(it.category==='CU 4c Armoured') return `CU 4-Core ${_arm4cSpec(it.size||'')}`;
-        if(it.category==='ALU/XLPE/SWA/PVC 4c') return `ALU 4-Core ${(it.size||'').includes('(PSP)')?'PVC/PVC/SWA/PVC':'XLPE/PVC/SWA/PVC'}`;
         return getCableTypes()[it.category]?.label||it.category||'';
       })();
-      const desc=it.isCustom?it.customName:(buildDesc(it)+(it.colour?` (${it.colour})`:''));
+      const desc=it.isCustom?it.customName:(it.size||'')+(it.colour?` (${it.colour})`:'');
       const amt=(it.price||0)*(it.qty||0);
       const scls=it.stock==='exstock'?'s-yes':it.stock==='no stock'?'s-no':'s-na';
       const stxt=it.stock==='exstock'?'✅ In stock':it.stock==='no stock'?'❌ No stock':'—';
@@ -605,7 +586,7 @@ function renderQuote(){
           </div>
           <div class="item-right">
             <div class="item-amt">RM ${rm(amt)}</div>
-            <div class="item-qp">${+it.qty} ${it.unit||'Mtr'} × RM${(+it.price).toFixed(2)}</div>
+            <div class="item-qp">${+it.qty} ${it.unit||'Mtr'} × RM${(+it.price).toFixed(4)}</div>
           </div>
         </div>
         <div class="item-btns">
@@ -701,8 +682,7 @@ function buildMsg(){
     const unit=it.unit==='Meter'?'mtr':(it.unit||'').toLowerCase();
     const drum=it.drum?'(D)':'';
     const desc=it.waDesc||(it.isCustom?it.customName:buildDesc(it));
-    const colSfx=(!it.isCustom&&it.colour)?` (${it.colour})`:'';
-    lines.push(`${desc}${colSfx} - ${+it.qty}${unit}${pfx?' '+pfx:''}`);
+    lines.push(`${desc} - ${+it.qty}${unit}${pfx?' '+pfx:''}`);
     if(it.remarks) lines.push(it.remarks);
     lines.push(`RM${(+it.price).toFixed(2)}/${unit}${drum}`);
     lines.push('');
@@ -718,9 +698,9 @@ function buildMsg(){
 }
 // Determine PVC/SWA/PVC vs XLPE/SWA/PVC for 4c armoured sizes
 function _arm4cSpec(sizeKey){
-  if((sizeKey||'').includes('(PSP)')) return 'PVC/PVC/SWA/PVC';
+  if((sizeKey||'').includes('(PSP)')) return 'PVC/SWA/PVC';
   const m=(sizeKey||'').match(/^[\d.]+/);
-  if(m && parseFloat(m[0])<=10) return 'PVC/PVC/SWA/PVC';
+  if(m && parseFloat(m[0])<=10) return 'PVC/SWA/PVC';
   return 'XLPE/SWA/PVC';
 }
 // CU/PVC 1c price conversion.
@@ -744,9 +724,6 @@ function _pvcConvert(cat, sizeKey, tierPrice){
   return {price:tierPrice, unit:null};
 }
 
-// Round price to nearest RM0.05
-function r05(v){ return Math.round(v / 0.05) * 0.05; }
-
 function buildDesc(it){
   const cat=it.category;
   const m=getCableTypes()[cat];
@@ -758,10 +735,6 @@ function buildDesc(it){
   if(cat==='CU 4c Armoured'){
     const spec=_arm4cSpec(rawSize);
     return `${s} x 4c CU/${spec}`;
-  }
-  if(cat==='ALU/XLPE/SWA/PVC 4c'){
-    const spec=rawSize.includes('(PSP)')?'PVC/PVC/SWA/PVC':'XLPE/PVC/SWA/PVC';
-    return `${s} x 4c AL/${spec}`;
   }
   // Non-armoured: category key already encodes spec (CU/XLPE/PVC or CU/PVC/PVC)
   // Just strip the trailing "Xc" → e.g. "CU/XLPE/PVC 4c" → "CU/XLPE/PVC"
@@ -841,7 +814,7 @@ const TNC=[
     'ALU/XLPE/PVC 1c':        {cn:'AL/',      ins:'XLPE/PVC',         rt:'0.6/1kV', st:'Power Cable compliant with MS2104/IEC60502-1'},
     'ALU/XLPE/SWA/PVC 2c':    {cn:'AL/',      ins:'XLPE/PVC/SWA/PVC', rt:'0.6/1kV', st:'Power Cable compliant with MS2107/IEC60502-1'},
     'ALU/XLPE/SWA/PVC 3c':    {cn:'AL/',      ins:'XLPE/PVC/SWA/PVC', rt:'0.6/1kV', st:'Power Cable compliant with MS2107/IEC60502-1'},
-    'ALU/XLPE/SWA/PVC 4c':    {cn:'AL/',      ins:'XLPE/PVC/SWA/PVC', rt:'0.6/1kV', st:'Power Cable compliant with MS2107/IEC60502-1', dynIns:true},
+    'ALU/XLPE/SWA/PVC 4c':    {cn:'AL/',      ins:'XLPE/PVC/SWA/PVC', rt:'0.6/1kV', st:'Power Cable compliant with MS2107/IEC60502-1'},
     'CU/Mica/PVC-FR':         {cn:'CU/MICA/',ins:'XLPE/PVC-FR',       rt:'450/750V', st:''},
     'CU/Mica/XLPE/PVC-FR':    {cn:'CU/MICA/',ins:'XLPE/PVC-FR',       rt:'0.6/1kV', st:'Power Cable compliant with MS2104/IEC60502-1/IEC60332-3-22/BS6387'},
     'CU/Mica/XLPE/LSZH':      {cn:'CU/MICA/',ins:'XLPE/LSZH',         rt:'0.6/1kV', st:'Power Cable compliant with MS2104/IEC60502-1/IEC60332-3-22/BS6387'},
@@ -855,14 +828,12 @@ const TNC=[
     const cc=String(it.category||'').match(/\b(\d+)c\s*$/i);
     const mc=String(it.size||'').match(/^(\d+)c$/i);
     const core=cm.coreFromSize?(mc?'x '+mc[1]+' Core':''):(cc?'x '+cc[1]+' Core':'');
-    let st=cm.st||''; let ins=cm.ins||'';
-    if(cm.dynSt){const r=String(it.size||'');const ps=r.indexOf('PSP')!==-1;const sm=r.match(/^([\d.]+)/);const sn=sm?parseFloat(sm[1]):999;st=(ps||sn<=10)?'Power Cable compliant with MS2103/IEC60502-1':'Power Cable compliant with MS2107/IEC60502-1';ins=(ps||sn<=10)?'PVC/PVC/SWA/PVC':'XLPE/PVC/SWA/PVC';}
-    if(cm.dynIns){const r=String(it.size||'');ins=r.indexOf('(PSP)')!==-1?'PVC/PVC/SWA/PVC':cm.ins;}
+    let st=cm.st||'';
+    if(cm.dynSt){const r=String(it.size||'');const ps=r.indexOf('PSP')!==-1;const sm=r.match(/^([\d.]+)/);const sn=sm?parseFloat(sm[1]):999;st=(ps||sn<=10)?'Power Cable compliant with MS2103/IEC60502-1':'Power Cable compliant with MS2107/IEC60502-1';}
     const parts=[sz];
     if(core)parts.push(core);
     if(cm.rt)parts.push(cm.rt);
-    if(cm.cn||ins)parts.push(cm.cn+ins);
-    if(!it.isCustom&&it.colour)parts.push(`(${it.colour})`);
+    if(cm.cn||cm.ins)parts.push(cm.cn+cm.ins);
     if(st)parts.push(st);
     let d=parts.join(' ');
     if(it.remarks)d+=' ('+it.remarks+')';
@@ -1036,11 +1007,7 @@ function lookupTiers(cat,size){
   // User types may map to a different price-DB key
   const ut=load('userCableTypes',[]).find(t=>t.key===cat);
   const priceKey=(ut?.priceKey)||cat;
-  const catDB=priceDB()[priceKey]||{};
-  if(catDB[size]) return catDB[size];
-  // Fallback: try mm²↔mm2 swap for data imported before normalisation fix
-  const alt=size.includes('mm²')?size.replace(/mm²/g,'mm2'):size.replace(/mm2/gi,'mm²');
-  return catDB[alt]||{};
+  return priceDB()[priceKey]?.[size]||{};
 }
 function hasPrices(){ return Object.keys(priceDB()).length>0; }
 
@@ -1097,9 +1064,9 @@ function renderItemSheet(ex){
   const unit = ex?.unit||(autoUnit||'Meter');
   // Convert using the resolved unit so price label matches
   const basePrice = rawBase!=null ? _pvcPriceFor(curCat,curSize,rawBase,unit) : null;
-  const autoPrice = basePrice!=null ? r05(basePrice*(1+markup/100)) : (ex?.price||'');
+  const autoPrice = basePrice!=null ? basePrice*(1+markup/100) : (ex?.price||'');
   const markupPreview = (markup>0 && basePrice!=null)
-    ? `RM${Number(basePrice).toFixed(4)} + ${markup}% → RM${Number(autoPrice).toFixed(2)}`
+    ? `RM${Number(basePrice).toFixed(4)} + ${markup}% → RM${Number(autoPrice).toFixed(4)}`
     : '';
   const p = autoPrice;
   const q = ex?.qty||'';
@@ -1182,9 +1149,9 @@ function renderItemSheet(ex){
         <div>
           <label class="lbl">Stock Status</label>
           <select class="inp" id="sel-stock">
-            <option value="exstock"          ${ex?.stock==='exstock'?'selected':''}>✅ In Stock</option>
+            <option value="exstock"          ${(ex?.stock||'exstock')==='exstock'?'selected':''}>✅ In Stock</option>
             <option value="no stock"         ${ex?.stock==='no stock'?'selected':''}>❌ No Stock</option>
-            <option value="no need to check" ${(ex?.stock||'no need to check')==='no need to check'?'selected':''}>— Skip</option>
+            <option value="no need to check" ${ex?.stock==='no need to check'?'selected':''}>— Skip</option>
           </select>
         </div>
         <div>
@@ -1233,13 +1200,6 @@ function onTypeChange(val){
 function onSizeChange(val){
   curSize=val;
   const tierData=lookupTiers(curCat,val);
-  // ── Diagnostic: warn if category has data but this size is missing ──
-  if(hasPrices()&&val&&curCat&&Object.keys(tierData).length===0){
-    const catDB=priceDB()[curCat]||{};
-    const nSizes=Object.keys(catDB).length;
-    if(nSizes===0) toast(`⚠️ No prices for "${curCat}" — re-import the price file.`,5000);
-    else toast(`⚠️ Size "${val}" not found in "${curCat}" (${nSizes} sizes in DB). Check Excel file.`,5000);
-  }
   const tiers=tiersFor(curCat);
   const tr=$('tier-row');
   const mr=$('markup-row');
@@ -1258,7 +1218,7 @@ function onSizeChange(val){
       if(p0!=null){
         const mu=parseFloat($('inp-markup')?.value)||0;
         const {price:cv,unit:au}=_pvcConvert(curCat,val,p0);
-        $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
+        $('inp-price').value=Number(cv*(1+mu/100)).toFixed(4);
         _updateMarkupPreview(cv,mu);
         if(au){const us=$('sel-unit');if(us)us.value=au;}
         const lp=$('lbl-price');if(lp)lp.textContent=`Price per ${au||'Meter'} (RM)`;
@@ -1278,7 +1238,7 @@ function onTierChange(val){
     const mu=parseFloat($('inp-markup')?.value)||0;
     const curUnit=$('sel-unit')?.value||'Meter';
     const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-    $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
+    $('inp-price').value=Number(cv*(1+mu/100)).toFixed(4);
     _updateMarkupPreview(cv,mu);
   }
 }
@@ -1291,7 +1251,7 @@ function onMarkupChange(){
   const mu=parseFloat($('inp-markup')?.value)||0;
   const curUnit=$('sel-unit')?.value||'Meter';
   const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-  $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
+  $('inp-price').value=Number(cv*(1+mu/100)).toFixed(4);
   _updateMarkupPreview(cv,mu);
 }
 
@@ -1304,7 +1264,7 @@ function onUnitChange(val){
   if(base==null) return;
   const mu=parseFloat($('inp-markup')?.value)||0;
   const cv=_pvcPriceFor(curCat,curSize,base,val);
-  $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
+  $('inp-price').value=Number(cv*(1+mu/100)).toFixed(4);
   _updateMarkupPreview(cv,mu);
   const lp=$('lbl-price');if(lp)lp.textContent=`Price per ${val} (RM)`;
 }
@@ -1312,7 +1272,7 @@ function onUnitChange(val){
 function _updateMarkupPreview(base,mu){
   const el=$('markup-preview'); if(!el) return;
   el.textContent=mu>0
-    ?`RM${Number(base).toFixed(4)} + ${mu}% → RM${r05(base*(1+mu/100)).toFixed(2)}`
+    ?`RM${Number(base).toFixed(4)} + ${mu}% → RM${Number(base*(1+mu/100)).toFixed(4)}`
     :'';
 }
 
@@ -1337,7 +1297,7 @@ function saveItem(){
   const price=parseFloat($('inp-price')?.value)||0;
   const qty=parseInt($('inp-qty')?.value)||1;
   const unit=$('sel-unit')?.value||'Meter';
-  const stock=$('sel-stock')?.value||'no need to check';
+  const stock=$('sel-stock')?.value||'exstock';
   const drum=$('chk-drum')?.checked||false;
   const remarks=$('inp-rem')?.value?.trim()||'';
 
@@ -1915,15 +1875,8 @@ function loadSheetJS(cb){
 function parseExcelPrices(wb){
   const db={};
   const sf=v=>{if(v===null||v===undefined||v==='')return null;const f=parseFloat(v);return isNaN(f)?null:f};
-  // Normalise size strings: strip spaces before "mm", convert mm2 → mm² (superscript)
-  const sz=v=>{
-    if(v===null||v===undefined)return null;
-    const s=String(v).trim().replace(/\s+(?=mm)/gi,'').replace(/mm\s*2\b/gi,'mm²');
-    return(!s||s.toLowerCase()==='nan')?null:s;
-  };
+  const sz=v=>{if(v===null||v===undefined)return null;const s=String(v).trim();return(!s||s.toLowerCase()==='nan')?null:s};
   const getRows=name=>{const ws=wb.Sheets[name];return ws?XLSX.utils.sheet_to_json(ws,{header:1,defval:null}):[]};
-  // Try multiple sheet name variants to be resilient to naming differences
-  const getRowsAny=(...names)=>{for(const n of names){const r=getRows(n);if(r.length)return r;}return[]};
 
   // Read CS price from Masterlist cell Q4 (row 4, column Q = 17th col)
   let csUSD='';
@@ -1938,16 +1891,16 @@ function parseExcelPrices(wb){
   }catch(e){}
 
   const CU ={'+3':6,'+2':8,'+1':10,'+0':12,'-1':14,'-2':16,'Below 100m':18,'Below 50m':20};
-  const ALU={'+3':4,'+2':6,'+1':8,'+0':10,'-1':12,'-2':14,'-3':16,'Below 200m':18,'Below 100m':20};
-  const FR ={'+3':3,'+2':5,'+1':7,'+0':9,'-1':11,'-2':13};
+  const ALU={'+3':5,'+2':7,'+1':9,'+0':11,'-1':13,'-2':15,'-3':17,'Below 200m':19,'Below 100m':21};
+  const FR ={'+3':4,'+2':6,'+1':8,'+0':10,'-1':12,'-2':14};
 
   const cuE =row=>{const e={offer:sf(row[4])};for(const[t,c]of Object.entries(CU))e[t]=sf(row[c]);return e};
   const aluE=row=>{const e={};for(const[t,c]of Object.entries(ALU))e[t]=sf(row[c]);return e};
   const frE =row=>{const e={};for(const[t,c]of Object.entries(FR))e[t]=sf(row[c]);return e};
 
   const cu=getRows('Copper Price List');
-  const alu=getRowsAny('Alu Price List','Aluminium Price List','ALU Price List','Aluminum Price List');
-  const fr=getRowsAny('FR Price List','FR Cable Price List','Fire Resistant Price List','FR cable price list');
+  const alu=getRows('Alu Price List');
+  const fr=getRows('FR Price List');
 
   // Single-core copper
   for(const[lbl,s,e]of[['CU/PVC 1c',6,21],['CU/XLPE/PVC 1c',27,41]]){
@@ -1989,22 +1942,14 @@ function parseExcelPrices(wb){
     db[xp]={...d};db[pp]={...d};
   }
 
-  // Aluminium — 4c armoured with PSP detection (same pattern as CU 4c)
-  {const aPsp={},aXsp={};let aPrev=null;
-  for(let i=43;i<=54;i++){const row=alu[i]||[];const size=sz(row[1]);if(!size)continue;const entry=aluE(row);
-    if(size==='P S P'||size.toUpperCase()==='PSP'){aPsp[aPrev?`${aPrev} (PSP)`:'PSP']=entry;}
-    else{aPrev=size;aXsp[size]=entry;}}
-  db['ALU/XLPE/SWA/PVC 4c']={};
-  for(const[s2,e2]of Object.entries(aPsp)){db['ALU/XLPE/SWA/PVC 4c'][s2]=e2;}
-  for(const[baseSz,xspE]of Object.entries(aXsp)){const pk=`${baseSz} (PSP)`;if(aPsp[pk])db['ALU/XLPE/SWA/PVC 4c'][pk]=aPsp[pk];db['ALU/XLPE/SWA/PVC 4c'][baseSz]=xspE;}}
-  // Remaining ALU sections (no PSP rows)
-  for(const[lbl,s,e]of[['ALU/PVC 1c',5,18],['ALU/XLPE/PVC 1c',24,37],['ALU/XLPE/SWA/PVC 3c',60,62],['ALU/XLPE/SWA/PVC 2c',68,70]]){
-    db[lbl]={};for(let i=s;i<=e;i++){const row=alu[i]||[];const size=sz(row[1]);if(!size)continue;db[lbl][size]=aluE(row);}
+  // Aluminium
+  for(const[lbl,s,e]of[['ALU/PVC 1c',6,19],['ALU/XLPE/PVC 1c',25,38],['ALU/XLPE/SWA/PVC 4c',44,55],['ALU/XLPE/SWA/PVC 3c',61,63],['ALU/XLPE/SWA/PVC 2c',69,71]]){
+    db[lbl]={};for(let i=s;i<=e;i++){const row=alu[i]||[];const size=sz(row[2]);if(!size)continue;db[lbl][size]=aluE(row);}
   }
 
   // FR cables
-  for(const[lbl,s,e]of[['CU/Mica/PVC-FR',4,19],['CU/Mica/XLPE/PVC-FR',25,44],['CU/Mica/XLPE/LSZH',48,67],['CU/Mica/XLPO-LSZH',71,90]]){
-    db[lbl]={};for(let i=s;i<=e&&i<fr.length;i++){const row=fr[i]||[];const size=sz(row[1]);if(!size)continue;db[lbl][size]=frE(row);}
+  for(const[lbl,s,e]of[['CU/Mica/PVC-FR',5,20],['CU/Mica/XLPE/PVC-FR',26,45],['CU/Mica/XLPE/LSZH',49,68],['CU/Mica/XLPO-LSZH',72,91]]){
+    db[lbl]={};for(let i=s;i<=e&&i<fr.length;i++){const row=fr[i]||[];const size=sz(row[2]);if(!size)continue;db[lbl][size]=frE(row);}
   }
 
   return {prices:db, csUSD};
@@ -2046,39 +1991,8 @@ window.importPrices=function(){
             if(m){const d=m[1];date=`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4,8)}`;}
             save('prices',{date,prices,csUSD});
             if(csUSD){const c=settings();c.csUSD=csUSD;saveCfg(c);}
-            // ── Immediately push to Firestore — don't wait for 2s debounce ──
-            // This ensures Firestore gets the complete CU+ALU+FR data right away,
-            // so the next _pullData on app open won't restore old CU-only prices.
-            clearTimeout(_syncTimer);
-            (async()=>{
-              const user=_auth.currentUser; if(!user) return;
-              try{
-                const fdata={};
-                _SYNC_KEYS.forEach(k=>{ try{const v=localStorage.getItem('dnf_'+k);if(v!==null)fdata[k]=JSON.parse(v);}catch{} });
-                await _db.collection('users').doc(user.uid).collection('data').doc('app').set(fdata);
-                console.log('[DNF] Prices force-pushed to Firestore');
-              }catch(e){ console.warn('[DNF] Force push failed:',e.message); }
-            })();
             renderCfg();
-            // ── Post-save verification: read BACK from localStorage ──
-            const saved=load('prices',{}).prices||{};
-            const cuSaved=Object.keys(saved['CU/PVC 1c']||{}).length;
-            const aluSaved=Object.keys(saved['ALU/PVC 1c']||{}).length;
-            const frSaved=Object.keys(saved['CU/Mica/PVC-FR']||{}).length;
-            const aluSample=saved['ALU/PVC 1c']?.['16mm²']?.['+0']??saved['ALU/PVC 1c']?.['16mm2']?.['+0']??null;
-            console.log('[DNF] Sheets:',wb.SheetNames.join(', '));
-            console.log('[DNF] Saved → CU:',cuSaved,'ALU:',aluSaved,'FR:',frSaved);
-            if(aluSaved===0&&frSaved===0){
-              const parsedAlu=Object.keys(prices['ALU/PVC 1c']||{}).length;
-              const parsedFr=Object.keys(prices['CU/Mica/PVC-FR']||{}).length;
-              if(parsedAlu>0||parsedFr>0){
-                toast(`⚠️ Storage save failed — parsed ALU:${parsedAlu} FR:${parsedFr} but stored 0. Try clearing app cache or use non-private browser.`,10000);
-              }else{
-                toast(`⚠️ ALU & FR not found in file. CU saved: ${cuSaved} sizes.`,6000);
-              }
-            }else{
-              toast(`✅ Prices saved — CU:${cuSaved} ALU:${aluSaved} FR:${frSaved} sizes${aluSample!=null?' | ALU 16mm²='+Number(aluSample).toFixed(4):''}`,6000);
-            }
+            toast(`✅ ${count} cable types loaded from Excel (${date})${csUSD?' · CS: USD '+csUSD:''}`);
           }catch(ex){toast('❌ Excel parse error: '+ex.message);}
         });
       }
