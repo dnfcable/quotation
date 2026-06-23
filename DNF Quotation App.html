@@ -833,7 +833,7 @@ const TNC=[
     'CU/PVC/PVC 3c':          {cn:'CU/',      ins:'PVC/PVC',          rt:'0.6/1kV',st:'Power Cable compliant with MS2102/IEC60502-1'},
     'CU/XLPE/PVC 4c':         {cn:'CU/',      ins:'XLPE/PVC',         rt:'0.6/1kV', st:'Power Cable compliant with MS2106/IEC60502-1'},
     'CU/PVC/PVC 4c':          {cn:'CU/',      ins:'PVC/PVC',          rt:'0.6/1kV',st:'Power Cable compliant with MS2102/IEC60502-1'},
-    'CU 4c Armoured':         {cn:'CU/',      ins:'XLPE/PVC/SWA/PVC', rt:'0.6/1kV', dynSt:true},
+    'CU 4c Armoured':         {cn:'CU/',      ins:'XLPE/PVC/SWA/PVC', rt:'0.6/1kV', dynSt:true, cores:'x 4 Core'},
     'CU/PVC/SWA/PVC 2c':      {cn:'CU/',      ins:'PVC/PVC/SWA/PVC',  rt:'0.6/1kV', st:'Power Cable compliant with MS2103/IEC60502-1'},
     'CU/PVC/SWA/PVC 3c':      {cn:'CU/',      ins:'PVC/PVC/SWA/PVC',  rt:'0.6/1kV', st:'Power Cable compliant with MS2103/IEC60502-1'},
     'CU Arm Multicore 1.5mm²':{cn:'CU/',      ins:'XLPE/PVC/SWA/PVC', rt:'0.6/1kV', st:'Power Cable compliant with MS2103/IEC60502-1',fixedSize:'DNF 1.5mm²',coreFromSize:true},
@@ -855,7 +855,7 @@ const TNC=[
     const sz=cm.fixedSize||('DNF '+String(it.size||'').replace(/\s*\([^)]*\)/g,'').trim());
     const cc=String(it.category||'').match(/\b(\d+)c\s*$/i);
     const mc=String(it.size||'').match(/^(\d+)c$/i);
-    const core=cm.coreFromSize?(mc?'x '+mc[1]+' Core':''):(cc?'x '+cc[1]+' Core':'');
+    const core=cm.cores?cm.cores:(cm.coreFromSize?(mc?'x '+mc[1]+' Core':''):(cc?'x '+cc[1]+' Core':''));
     let st=cm.st||''; let ins=cm.ins||'';
     if(cm.dynSt){const r=String(it.size||'');const ps=r.indexOf('PSP')!==-1;const sm=r.match(/^([\d.]+)/);const sn=sm?parseFloat(sm[1]):999;st=(ps||sn<=10)?'Power Cable compliant with MS2103/IEC60502-1':'Power Cable compliant with MS2107/IEC60502-1';ins=(ps||sn<=10)?'PVC/PVC/SWA/PVC':'XLPE/PVC/SWA/PVC';}
     if(cm.dynIns){const r=String(it.size||'');ins=r.indexOf('(PSP)')!==-1?'PVC/PVC/SWA/PVC':cm.ins;}

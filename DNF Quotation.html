@@ -1163,7 +1163,7 @@ function populateFromMobileApp(fromButton) {
       'CU/PVC/PVC 3c':          {cn:'CU/',      ins:'PVC/PVC',           rt:'0.6/1kV', st:'Power Cable compliant with MS2102/IEC60502-1'},
       'CU/XLPE/PVC 4c':         {cn:'CU/',      ins:'XLPE/PVC',          rt:'0.6/1kV',  st:'Power Cable compliant with MS2106/IEC60502-1'},
       'CU/PVC/PVC 4c':          {cn:'CU/',      ins:'PVC/PVC',           rt:'0.6/1kV', st:'Power Cable compliant with MS2102/IEC60502-1'},
-      'CU 4c Armoured':         {cn:'CU/',      ins:'XLPE/PVC/SWA/PVC',  rt:'0.6/1kV',  st:'Power Cable compliant with MS2103/IEC60502-1'},
+      'CU 4c Armoured':         {cn:'CU/',      ins:'XLPE/PVC/SWA/PVC',  rt:'0.6/1kV',  st:'Power Cable compliant with MS2103/IEC60502-1', cores:'x 4 Core'},
       'CU/PVC/SWA/PVC 2c':      {cn:'CU/',      ins:'PVC/PVC/SWA/PVC',   rt:'0.6/1kV',  st:'Power Cable compliant with MS2103/IEC60502-1'},
       'CU/PVC/SWA/PVC 3c':      {cn:'CU/',      ins:'PVC/PVC/SWA/PVC',   rt:'0.6/1kV',  st:'Power Cable compliant with MS2103/IEC60502-1'},
       'CU Arm Multicore 1.5mm²':{cn:'CU/', ins:'XLPE/PVC/SWA/PVC',  rt:'0.6/1kV',  st:'Power Cable compliant with MS2103/IEC60502-1', fixedSize:'DNF 1.5mm²', coreFromSize:true},
@@ -1191,7 +1191,9 @@ function populateFromMobileApp(fromButton) {
       var cselEl = tr.querySelector('.csel');
       if (cselEl) {
         var coreLabel = '';
-        if (cm.coreFromSize) {
+        if (cm.cores) {
+          coreLabel = cm.cores;
+        } else if (cm.coreFromSize) {
           var mcm = String(it.size || '').match(/^(\d+)c$/i);
           coreLabel = mcm ? 'x ' + mcm[1] + ' Core' : '';
         } else {
