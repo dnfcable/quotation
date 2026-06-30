@@ -519,6 +519,7 @@ const saveCfg  = v=>save('cfg',v);
 // ── Helpers ──────────────────────────────────────────────────
 const $=id=>document.getElementById(id);
 const rm=n=>n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+const rmPrice=n=>{n=+n;let s=n.toFixed(3);if(s.endsWith('0'))s=s.slice(0,-1);if(s.endsWith('.'))s+='00';return s.replace(/\B(?=(\d{3})+(?!\d))/g,',');};
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const ini=n=>(n||'?').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
 const today=()=>{ const d=new Date(); return [d.getDate(),d.getMonth()+1,d.getFullYear()].map((v,i)=>i<2?String(v).padStart(2,'0'):v).join('/') };
@@ -605,7 +606,7 @@ function renderQuote(){
           </div>
           <div class="item-right">
             <div class="item-amt">RM ${rm(amt)}</div>
-            <div class="item-qp">${+it.qty} ${it.unit||'Mtr'} × RM${(+it.price).toFixed(2)}</div>
+            <div class="item-qp">${+it.qty} ${it.unit||'Mtr'} × RM${rmPrice(it.price)}</div>
           </div>
         </div>
         <div class="item-btns">
@@ -704,7 +705,7 @@ function buildMsg(){
     const colSfx=(!it.isCustom&&it.colour)?` (${it.colour})`:'';
     lines.push(`${desc}${colSfx} - ${+it.qty}${unit}${pfx?' '+pfx:''}`);
     if(it.remarks) lines.push(it.remarks);
-    lines.push(`RM${(+it.price).toFixed(2)}/${unit}${drum}`);
+    lines.push(`RM${rmPrice(it.price)}/${unit}${drum}`);
     lines.push('');
   });
   if(ST.transport!=null&&(ST.transport||0)>0) lines.push(`Transport Charge: RM${(ST.transport||0).toFixed(2)}\n`);
@@ -808,6 +809,7 @@ function buildMobileQuotationHTML(data){
   const c=data.customer||{};
   function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   function fmtRM(n){return 'RM '+n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+  function fmtRMUnit(n){let s=n.toFixed(3);if(s.endsWith('0'))s=s.slice(0,-1);if(s.endsWith('.'))s+='00';return 'RM '+s.replace(/\B(?=(\d{3})+(?!\d))/g,',');}
 const TNC=[
     ["NOTE","Prices quoted are applicable for the packaged offer only. In the event of any discrepancy between this quotation and the Customer's Purchase Order (PO), the terms and conditions stated in this quotation shall prevail unless otherwise mutually agreed in writing. Ex-stock items are subject to availability on a first-come, first-served basis."],
     ["VALIDITY",`This quotation shall remain valid until 5:00 PM on the above-mentioned date. Notwithstanding the validity period stated herein, prices are subject to adjustment should the London Metal Exchange (LME) copper price exceed USD ${data.csUSD||'13,850'} per metric ton (MT) during the quotation validity period.`],
@@ -822,7 +824,8 @@ const TNC=[
     ["STORAGE","Storage charges at the rate of 1.5% per month shall apply to cables stored in our warehouse beyond one (1) month from the confirmed or estimated delivery date. The Supplier shall not be held responsible for any wear and tear, deterioration, or damage to cable drums arising during the storage period."],
     ["CANCELLATION","For confirmed Purchase Orders (PO), any cancellation, deferment, or reduction in order quantity may be subject to a penalty charge of up to 50% of the PO value to cover production, material procurement, and associated commercial costs."],
     ["FAT","The Supplier's factory test results and inspection findings shall be deemed final and conclusive. Any inspection, witnessing, or testing requested in the presence of a third party shall be subject to all related costs, fees, and expenses being borne solely by the Buyer."],
-    ["WARRANTY","A one (1) year warranty shall apply solely to manufacturing defects under proper handling, installation, and operating conditions, and shall exclude damages arising from improper installation, misuse, negligence, external factors, unauthorised modifications, or normal wear and tear."]
+    ["WARRANTY","A one (1) year warranty shall apply solely to manufacturing defects under proper handling, installation, and operating conditions, and shall exclude damages arising from improper installation, misuse, negligence, external factors, unauthorised modifications, or normal wear and tear."],
+    ["FORCE MAJEURE","We shall not be liable for any delay or failure to meet its obligation under this offer and the subsequent contract due to any cause beyond its reasonable control including but not limited to pandemic/epidemic, fire, war riot, malicious act of damage, civil commotion, strike, acts of God, lock-out, industrial actions or trade disputes, refusal of licences, power failure or breakdown in machinery fire, shortage, delay or lack of supply of raw material from supplier."]
   ];
   const CM={
     'CU/PVC 1c':              {cn:'CU/',      ins:'PVC Insulated',    rt:'450/750V',st:'Power Cable compliant with MS2112/IEC60227'},
@@ -875,7 +878,7 @@ const TNC=[
     if(it.drum)drums++;
     const q=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,a=q*p;
     sub+=a;
-    return `<tr><td class="tc">${i+1}</td><td>${getDesc(it)}</td><td class="tc">${escH(it.unit||'meter')}</td><td class="tr">${q}</td><td class="tr">${fmtRM(p)}</td><td class="tr">${fmtRM(a)}</td></tr>`;
+    return `<tr><td class="tc">${i+1}</td><td>${getDesc(it)}</td><td class="tc">${escH(it.unit||'meter')}</td><td class="tr">${q}</td><td class="tr">${fmtRMUnit(p)}</td><td class="tr">${fmtRM(a)}</td></tr>`;
   });
   if(drums>0){const da=drums*150;sub+=da;rows.push(`<tr><td class="tc">${(data.items||[]).length+1}</td><td>Drum Charges (${drums} drum${drums>1?'s':''})</td><td class="tc">unit</td><td class="tr">${drums}</td><td class="tr">${fmtRM(150)}</td><td class="tr">${fmtRM(da)}</td></tr>`);}
   const sp=data.sst!==false?10:0,sa=sub*sp/100,tr=data.transport||0,tot=sub+sa+tr;

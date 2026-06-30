@@ -515,6 +515,10 @@
         <td class="tnc-k">WARRANTY</td>
         <td class="tnc-v">A one (1) year warranty shall apply solely to manufacturing defects under proper handling, installation, and operating conditions, and shall exclude damages arising from improper installation, misuse, negligence, external factors, unauthorised modifications, or normal wear and tear.</td>
       </tr>
+      <tr>
+        <td class="tnc-k">FORCE MAJEURE</td>
+        <td class="tnc-v">We shall not be liable for any delay or failure to meet its obligation under this offer and the subsequent contract due to any cause beyond its reasonable control including but not limited to pandemic/epidemic, fire, war riot, malicious act of damage, civil commotion, strike, acts of God, lock-out, industrial actions or trade disputes, refusal of licences, power failure or breakdown in machinery fire, shortage, delay or lack of supply of raw material from supplier.</td>
+      </tr>
     </table>
     <div class="closing">
       Thank you for the opportunity to submit our quotation for the supply of power cables. DNF CABLE SDN BHD remains committed to delivering high-quality cable solutions that comply with international standards, technical specifications, and project requirements.
@@ -688,7 +692,7 @@ function addRow() {
         style="width:100%;text-align:right;" oninput="calcRow(${id})">
     </td>
     <td class="td-pri">
-      <input type="number" class="pinp" min="0" step="0.01" placeholder="0.00"
+      <input type="number" class="pinp" min="0" step="0.001" placeholder="0.000"
         style="width:100%;text-align:right;" oninput="calcRow(${id})">
     </td>
     <td class="td-amt" id="a${id}">—</td>
@@ -1151,7 +1155,7 @@ function populateFromMobileApp(fromButton) {
     var qinp = tr.querySelector('.qinp');
     var pinp  = tr.querySelector('.pinp');
     if (qinp) qinp.value = it.qty || '';
-    if (pinp) pinp.value = it.price ? Number(it.price).toFixed(2) : '';
+    if (pinp) pinp.value = it.price ? Number(it.price).toFixed(3) : '';
 
     // ── Fill 6 description dropdowns for standard cable types ──
     var CAT_MAP = {
