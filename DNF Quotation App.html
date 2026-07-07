@@ -84,11 +84,12 @@ select.inp{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.
 .item-right{text-align:right;flex-shrink:0}
 .item-amt{font-weight:700;font-size:14px;color:#1a3a6b}
 .item-qp{font-size:11px;color:#718096}
-.item-btns{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #edf2f7;max-height:0;overflow:hidden;transition:max-height .2s}
+.item-btns{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-top:1px solid #edf2f7;max-height:0;overflow:hidden;transition:max-height .2s}
 .item-card.open .item-btns{max-height:50px}
 .item-btn{padding:11px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:5px}
 .i-edit{background:#ebf8ff;color:#2b6cb0}
 .i-copy{background:#fffff0;color:#c07d0a}
+.i-move{background:#f0fff4;color:#276749}
 .i-del{background:#fff5f5;color:#c53030}
 
 /* Stock badge */
@@ -602,7 +603,7 @@ function renderQuote(){
           <div class="item-num">${i+1}</div>
           <div class="item-mid">
             <div class="item-desc">${esc(desc)}</div>
-            <div class="item-cat">${esc(cat)}${it.tier?` <span style="font-size:11px;color:#718096">· ${it.tier}${it.markup>0?` <span style="background:#ebf4ff;color:#2b6cb0;padding:1px 5px;border-radius:6px;margin-left:2px">+${it.markup}%</span>`:''}</span>`:''} &nbsp;<span class="stock ${scls}">${stxt}</span>${it.drum?' 🥁':''}</div>
+            <div class="item-cat">${esc(cat)}${it.tier?` <span style="font-size:11px;color:#718096">· ${it.tier}${it.markup>0?` <span style="background:#ebf4ff;color:#2b6cb0;padding:1px 5px;border-radius:6px;margin-left:2px">+${it.markup}%</span>`:''}${it.discount>0?` <span style="background:#fff5f5;color:#c53030;padding:1px 5px;border-radius:6px;margin-left:2px">−${it.discount}%</span>`:''}</span>`:''} &nbsp;<span class="stock ${scls}">${stxt}</span>${it.drum?' 🥁':''}</div>
           </div>
           <div class="item-right">
             <div class="item-amt">RM ${rm(amt)}</div>
@@ -612,6 +613,7 @@ function renderQuote(){
         <div class="item-btns">
           <button class="item-btn i-edit" onclick="editItem(${i})">✎ Edit</button>
           <button class="item-btn i-copy" onclick="copyItem(${i})">⧉ Copy</button>
+          <button class="item-btn i-move" onclick="moveItem(${i})">↕ Move</button>
           <button class="item-btn i-del"  onclick="delItem(${i})">🗑 Delete</button>
         </div>
       </div>`;
@@ -693,6 +695,39 @@ function delItem(i){ST.items.splice(i,1);renderQuote();toast('Item removed');}
 function copyItem(i){ST.items.splice(i+1,0,JSON.parse(JSON.stringify(ST.items[i])));renderQuote();toast('Copied');}
 function editItem(i){openItemModal(i);}
 
+function _itemLabel(it){
+  if(!it) return '';
+  const desc=it.isCustom?it.customName:(getCableTypes()[it.category]?.label||it.category||'');
+  const sz=!it.isCustom&&it.size?` ${it.size}`:'';
+  return `${desc}${sz}`.trim();
+}
+function moveItem(i){
+  const n=ST.items.length;
+  const opts=ST.items.map((it,idx)=>{
+    const tag=idx===i?' (current)':'';
+    return `<option value="${idx}" ${idx===i?'selected':''}>${esc(idx+1+' — '+_itemLabel(it)+tag)}</option>`;
+  }).join('');
+  openSheet(`
+    <div class="sh-body">
+      <div style="font-size:13px;color:#718096">Move item <b>${i+1} — ${esc(_itemLabel(ST.items[i]))}</b> to:</div>
+      <select class="inp" id="sel-move-pos">${opts}</select>
+    </div>
+    <div class="sh-foot">
+      <button class="btn btn-grey btn-sm" onclick="closeSheet()">Cancel</button>
+      <button class="btn btn-navy btn-full" onclick="doMoveItem(${i})">Move</button>
+    </div>
+  `, '↕ Move Item');
+}
+function doMoveItem(i){
+  const n=ST.items.length;
+  let t=parseInt($('sel-move-pos')?.value);
+  if(isNaN(t))t=i; if(t<0)t=0; if(t>n-1)t=n-1;
+  if(t!==i){const [item]=ST.items.splice(i,1);ST.items.splice(t,0,item);}
+  closeSheet();
+  renderQuote();
+  toast(`Moved to position ${t+1}`);
+}
+
 // ── WhatsApp ─────────────────────────────────────────────────
 function buildMsg(){
   const lines=[`\u{1F4C5} *${ST.date}*\n`];
@@ -747,6 +782,9 @@ function _pvcConvert(cat, sizeKey, tierPrice){
 
 // Round price to nearest RM0.05
 function r05(v){ return Math.round(v / 0.05) * 0.05; }
+// Markup formula: 10% markup -> base / 0.9, 2% markup -> base / 0.98 (no rounding to nearest 0.05)
+function applyMarkup(base, mu){ return mu>0 ? base/(1-mu/100) : base; }
+function applyDiscount(price, disc){ return disc>0 ? price*(1-disc/100) : price; }
 
 function buildDesc(it){
   const cat=it.category;
@@ -1093,19 +1131,21 @@ function renderItemSheet(ex){
 
   // Markup % — from existing item or global default in settings
   const markup = ex?.markup!=null ? ex.markup : (settings().markup||0);
+  const discount = ex?.discount!=null ? ex.discount : 0;
 
-  // Price: tier base → PVC conversion → markup → final
+  // Price: tier base → PVC conversion → markup → discount → final
   // Determine unit first (saved unit wins; fall back to auto-detect)
   const rawBase = (ex?.tier && tierData[ex.tier]!=null) ? tierData[ex.tier] : null;
   const {unit:autoUnit} = rawBase!=null ? _pvcConvert(curCat,curSize,rawBase) : {unit:null};
   const unit = ex?.unit||(autoUnit||'Meter');
   // Convert using the resolved unit so price label matches
   const basePrice = rawBase!=null ? _pvcPriceFor(curCat,curSize,rawBase,unit) : null;
-  const autoPrice = basePrice!=null ? r05(basePrice*(1+markup/100)) : (ex?.price||'');
-  const markupPreview = (markup>0 && basePrice!=null)
-    ? `RM${Number(basePrice).toFixed(4)} + ${markup}% → RM${Number(autoPrice).toFixed(2)}`
+  const markedUp = basePrice!=null ? applyMarkup(basePrice,markup) : null;
+  const autoPrice = markedUp!=null ? applyDiscount(markedUp,discount) : (ex?.price||'');
+  const markupPreview = (basePrice!=null && (markup>0||discount>0))
+    ? _buildMarkupPreviewText(basePrice,markup,discount)
     : '';
-  const p = autoPrice;
+  const p = autoPrice!==''&&autoPrice!=null ? Number(autoPrice).toFixed(4) : '';
   const q = ex?.qty||'';
 
   // Price hint
@@ -1156,7 +1196,20 @@ function renderItemSheet(ex){
                    style="padding-right:30px">
             <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#718096;pointer-events:none;font-size:14px">%</span>
           </div>
-          <div id="markup-preview" style="font-size:13px;color:#276749;flex:1">${markupPreview}</div>
+        </div>
+      </div>
+
+      <!-- Discount % (shown together with tier row) -->
+      <div id="discount-row" style="${showTiers?'':'display:none'}">
+        <label class="lbl">Discount %</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="position:relative;width:120px">
+            <input class="inp" id="inp-discount" type="number" step="0.5" min="0" max="100"
+                   placeholder="0" value="${discount||''}" oninput="onDiscountChange()"
+                   style="padding-right:30px">
+            <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#718096;pointer-events:none;font-size:14px">%</span>
+          </div>
+          <div id="markup-preview" style="font-size:12px;color:#276749;flex:1">${markupPreview}</div>
         </div>
       </div>`:''}
 
@@ -1247,6 +1300,7 @@ function onSizeChange(val){
   const tiers=tiersFor(curCat);
   const tr=$('tier-row');
   const mr=$('markup-row');
+  const dr=$('discount-row');
   if(hasPrices()&&val&&curCat){
     if(tr){
       const tierOpts=tiers.map(t=>{
@@ -1257,13 +1311,15 @@ function onSizeChange(val){
       $('sel-tier').innerHTML=tierOpts;
       tr.style.display='';
       if(mr) mr.style.display='';
-      // Auto-fill +0 price with PVC conversion + markup applied
+      if(dr) dr.style.display='';
+      // Auto-fill +0 price with PVC conversion + markup + discount applied
       const p0=tierData['+0'];
       if(p0!=null){
         const mu=parseFloat($('inp-markup')?.value)||0;
+        const disc=parseFloat($('inp-discount')?.value)||0;
         const {price:cv,unit:au}=_pvcConvert(curCat,val,p0);
-        $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
-        _updateMarkupPreview(cv,mu);
+        $('inp-price').value=applyDiscount(applyMarkup(cv,mu),disc).toFixed(4);
+        _updateMarkupPreview(cv,mu,disc);
         if(au){const us=$('sel-unit');if(us)us.value=au;}
         const lp=$('lbl-price');if(lp)lp.textContent=`Price per ${au||'Meter'} (RM)`;
       }
@@ -1272,6 +1328,7 @@ function onSizeChange(val){
   } else {
     if(tr) tr.style.display='none';
     if(mr) mr.style.display='none';
+    if(dr) dr.style.display='none';
     refreshPriceHint();
   }
 }
@@ -1280,10 +1337,11 @@ function onTierChange(val){
   const base=lookupTiers(curCat,curSize)[val];
   if(base!=null){
     const mu=parseFloat($('inp-markup')?.value)||0;
+    const disc=parseFloat($('inp-discount')?.value)||0;
     const curUnit=$('sel-unit')?.value||'Meter';
     const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-    $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
-    _updateMarkupPreview(cv,mu);
+    $('inp-price').value=applyDiscount(applyMarkup(cv,mu),disc).toFixed(4);
+    _updateMarkupPreview(cv,mu,disc);
   }
 }
 
@@ -1293,10 +1351,24 @@ function onMarkupChange(){
   const base=lookupTiers(curCat,curSize)[tier];
   if(base==null) return;
   const mu=parseFloat($('inp-markup')?.value)||0;
+  const disc=parseFloat($('inp-discount')?.value)||0;
   const curUnit=$('sel-unit')?.value||'Meter';
   const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-  $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
-  _updateMarkupPreview(cv,mu);
+  $('inp-price').value=applyDiscount(applyMarkup(cv,mu),disc).toFixed(4);
+  _updateMarkupPreview(cv,mu,disc);
+}
+
+function onDiscountChange(){
+  const tier=$('sel-tier')?.value;
+  if(!tier||!curSize||!curCat) return;
+  const base=lookupTiers(curCat,curSize)[tier];
+  if(base==null) return;
+  const mu=parseFloat($('inp-markup')?.value)||0;
+  const disc=parseFloat($('inp-discount')?.value)||0;
+  const curUnit=$('sel-unit')?.value||'Meter';
+  const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
+  $('inp-price').value=applyDiscount(applyMarkup(cv,mu),disc).toFixed(4);
+  _updateMarkupPreview(cv,mu,disc);
 }
 
 // Called when the Unit dropdown changes — recalculates price for CU/PVC 1c
@@ -1307,17 +1379,25 @@ function onUnitChange(val){
   const base=lookupTiers(curCat,curSize)[tier];
   if(base==null) return;
   const mu=parseFloat($('inp-markup')?.value)||0;
+  const disc=parseFloat($('inp-discount')?.value)||0;
   const cv=_pvcPriceFor(curCat,curSize,base,val);
-  $('inp-price').value=r05(cv*(1+mu/100)).toFixed(2);
-  _updateMarkupPreview(cv,mu);
+  $('inp-price').value=applyDiscount(applyMarkup(cv,mu),disc).toFixed(4);
+  _updateMarkupPreview(cv,mu,disc);
   const lp=$('lbl-price');if(lp)lp.textContent=`Price per ${val} (RM)`;
 }
 
-function _updateMarkupPreview(base,mu){
+function _buildMarkupPreviewText(base,mu,disc){
+  if(mu<=0&&disc<=0) return '';
+  const marked=applyMarkup(base,mu);
+  const final=applyDiscount(marked,disc);
+  let t=`RM${Number(base).toFixed(4)}`;
+  if(mu>0) t+=` +${mu}% → RM${Number(marked).toFixed(4)}`;
+  if(disc>0) t+=` −${disc}% → RM${Number(final).toFixed(4)}`;
+  return t;
+}
+function _updateMarkupPreview(base,mu,disc=0){
   const el=$('markup-preview'); if(!el) return;
-  el.textContent=mu>0
-    ?`RM${Number(base).toFixed(4)} + ${mu}% → RM${r05(base*(1+mu/100)).toFixed(2)}`
-    :'';
+  el.textContent=_buildMarkupPreviewText(base,mu,disc);
 }
 
 function refreshPriceHint(){
@@ -1338,6 +1418,7 @@ function saveItem(){
   const colour=$('sel-colour')?.value||'';
   const tier=$('sel-tier')?.value||'';
   const markup=parseFloat($('inp-markup')?.value)||0;
+  const discount=parseFloat($('inp-discount')?.value)||0;
   const price=parseFloat($('inp-price')?.value)||0;
   const qty=parseInt($('inp-qty')?.value)||1;
   const unit=$('sel-unit')?.value||'Meter';
@@ -1356,7 +1437,7 @@ function saveItem(){
     const cc=load('cc',[])[ccIdx]||{};
     item={isCustom:true,customName:cc.name||'',customIdx:ccIdx,price,qty,unit,stock,drum,remarks,waDesc:cc.waDesc||cc.name||''};
   } else {
-    item={isCustom:false,category:typeVal,group:curGroup,size,colour,tier,markup,price,qty,unit,stock,drum,remarks,waDesc:''};
+    item={isCustom:false,category:typeVal,group:curGroup,size,colour,tier,markup,discount,price,qty,unit,stock,drum,remarks,waDesc:''};
   }
 
   if(editIdx>=0) ST.items[editIdx]=item; else ST.items.push(item);
@@ -2338,6 +2419,7 @@ async function generatePDFApp(){
     sst:ST.sst!==false,
     transport:ST.transport||0,
     csUSD:cfg.csUSD||_pdb2.csUSD||'',
+    paymentNote:ST.paymentNote||'',
     customer:ST.customer||{},
     items:ST.items
   };

@@ -195,6 +195,9 @@
       width: 60px; text-align: center; padding: 0 1px;
     }
     @media print { .tnc-inline-input { border-bottom: none; } }
+    .tnc-v[contenteditable="true"] { cursor: text; outline: none; }
+    .tnc-v[contenteditable="true"]:focus { background: #FFFFE0; }
+    @media print { .tnc-v[contenteditable="true"]:focus { background: var(--row); } }
     .closing {
       margin-top: 7px; padding: 7px;
       background: var(--row); border: 1px solid var(--border);
@@ -469,7 +472,7 @@
       </tr>
       <tr>
         <td class="tnc-k">TERM</td>
-        <td class="tnc-v">Payment shall be made in full and cleared prior to delivery. All banking and related charges shall be borne solely by the Customer. A draft copy of the Letter of Credit (LC) shall be submitted to us for review and comments prior to issuance through the bank, subject to mutual agreement by both parties. Any overdue outstanding amounts must be fully settled before commencement of any subsequent deliveries.</td>
+        <td class="tnc-v" id="tnc-payment" contenteditable="true">Payment shall be made in full and cleared prior to delivery. All banking and related charges shall be borne solely by the Customer. A draft copy of the Letter of Credit (LC) shall be submitted to us for review and comments prior to issuance through the bank, subject to mutual agreement by both parties. Any overdue outstanding amounts must be fully settled before commencement of any subsequent deliveries.</td>
       </tr>
       <tr>
         <td class="tnc-k">INTEREST</td>
