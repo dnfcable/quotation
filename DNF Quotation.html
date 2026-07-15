@@ -782,7 +782,11 @@ function calcRow(id) {
   if (!tr) return;
   const q = parseFloat(tr.querySelector('.qinp').value) || 0;
   const p = parseFloat(tr.querySelector('.pinp').value) || 0;
-  document.getElementById('a' + id).textContent = q * p > 0 ? fmtRM(q * p) : '—';
+  const amt = q * p;
+  const use3dp = tr.dataset.pvc3dp === 'true';
+  document.getElementById('a' + id).textContent = amt > 0
+    ? (use3dp ? 'RM ' + amt.toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g,',') : fmtRM(amt))
+    : '—';
   calcTotals();
 }
 
@@ -806,6 +810,18 @@ function fmtRM(n) {
   return 'RM ' + n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+
+function r05q(v){ return Math.round(v/0.05)*0.05; }
+function fmtPriceQ(it, n){
+  n=+n;
+  if(it.isCustom) return r05q(n).toFixed(2);
+  var sz=parseFloat(it.size||'');
+  var isSmall=sz>=1.5&&sz<=4;
+  var isPvc3dp=isSmall&&(it.unit||'Meter')==='Meter'&&(it.category||'').includes('PVC');
+  if(isPvc3dp) return n.toFixed(3);
+  if(isSmall) return n.toFixed(2);
+  return r05q(n).toFixed(2);
+}
 function clearForm() {
   if (!confirm('Clear all customer info and all item rows?')) return;
   ['f_co','f_att','f_tel','f_email','f_ref','f_sp'].forEach(id => {
@@ -1158,7 +1174,9 @@ function populateFromMobileApp(fromButton) {
     var qinp = tr.querySelector('.qinp');
     var pinp  = tr.querySelector('.pinp');
     if (qinp) qinp.value = it.qty || '';
-    if (pinp) pinp.value = it.price ? Number(it.price).toFixed(3) : '';
+    if (pinp) pinp.value = it.price ? fmtPriceQ(it, it.price) : '';
+    var _sz=parseFloat(it.size||''); var _sm=_sz>=1.5&&_sz<=4;
+    if(_sm&&!it.isCustom&&(it.unit||'Meter')==='Meter'&&(it.category||'').includes('PVC')) tr.dataset.pvc3dp='true';
 
     // ── Fill 6 description dropdowns for standard cable types ──
     var CAT_MAP = {

@@ -521,6 +521,15 @@ const saveCfg  = v=>save('cfg',v);
 const $=id=>document.getElementById(id);
 const rm=n=>n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 const rmPrice=n=>{n=+n;let s=n.toFixed(3);if(s.endsWith('0'))s=s.slice(0,-1);if(s.endsWith('.'))s+='00';return s.replace(/\B(?=(\d{3})+(?!\d))/g,',');};
+const rmPrice3=n=>{n=+n;return n.toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g,',');};
+function _showPrice3dp(it){if(!it||it.isCustom)return false;const sz=parseFloat(it.size);return sz>=1.5&&sz<=4&&(it.unit||'Meter')==='Meter'&&(it.category||'').includes('PVC');}
+function _isSmallCable(sz){const s=parseFloat(sz);return s>=1.5&&s<=4;}
+// Format a unit price for display: PVC 1.5-4mm/meter→3dp, other 1.5-4mm→2dp, large→2dp rounded to 0.05
+function _fmtPriceNum(it,n){
+  if(_showPrice3dp(it)) return rmPrice3(n);
+  if(it&&!it.isCustom&&_isSmallCable(it.size)) return rm(n);
+  return rm(r05(n));
+}
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const ini=n=>(n||'?').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
 const today=()=>{ const d=new Date(); return [d.getDate(),d.getMonth()+1,d.getFullYear()].map((v,i)=>i<2?String(v).padStart(2,'0'):v).join('/') };
@@ -606,8 +615,8 @@ function renderQuote(){
             <div class="item-cat">${esc(cat)}${it.tier?` <span style="font-size:11px;color:#718096">· ${it.tier}${it.markup>0?` <span style="background:#ebf4ff;color:#2b6cb0;padding:1px 5px;border-radius:6px;margin-left:2px">+${it.markup}%</span>`:''}${it.discount>0?` <span style="background:#fff5f5;color:#c53030;padding:1px 5px;border-radius:6px;margin-left:2px">−${it.discount}%</span>`:''}</span>`:''} &nbsp;<span class="stock ${scls}">${stxt}</span>${it.drum?' 🥁':''}</div>
           </div>
           <div class="item-right">
-            <div class="item-amt">RM ${rm(amt)}</div>
-            <div class="item-qp">${+it.qty} ${it.unit||'Mtr'} × RM${rmPrice(it.price)}</div>
+            <div class="item-amt">RM ${_showPrice3dp(it)?rmPrice3(amt):rm(amt)}</div>
+            <div class="item-qp">${+it.qty} ${it.unit||'Mtr'} × RM${_fmtPriceNum(it,it.price)}</div>
           </div>
         </div>
         <div class="item-btns">
@@ -740,7 +749,7 @@ function buildMsg(){
     const colSfx=(!it.isCustom&&it.colour)?` (${it.colour})`:'';
     lines.push(`${desc}${colSfx} - ${+it.qty}${unit}${pfx?' '+pfx:''}`);
     if(it.remarks) lines.push(it.remarks);
-    lines.push(`RM${rmPrice(it.price)}/${unit}${drum}`);
+    lines.push(`RM${_fmtPriceNum(it,it.price)}/${unit}${drum}`);
     lines.push('');
   });
   if(ST.transport!=null&&(ST.transport||0)>0) lines.push(`Transport Charge: RM${(ST.transport||0).toFixed(2)}\n`);
@@ -847,7 +856,8 @@ function buildMobileQuotationHTML(data){
   const c=data.customer||{};
   function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   function fmtRM(n){return 'RM '+n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
-  function fmtRMUnit(n){let s=n.toFixed(3);if(s.endsWith('0'))s=s.slice(0,-1);if(s.endsWith('.'))s+='00';return 'RM '+s.replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+  function fmtRMUnit(n,it){ return 'RM '+_fmtPriceNum(it,n); }
+  function fmtRMAmt(n,it){ return _showPrice3dp(it)?'RM '+rmPrice3(n):fmtRM(n); }
 const TNC=[
     ["NOTE","Prices quoted are applicable for the packaged offer only. In the event of any discrepancy between this quotation and the Customer's Purchase Order (PO), the terms and conditions stated in this quotation shall prevail unless otherwise mutually agreed in writing. Ex-stock items are subject to availability on a first-come, first-served basis."],
     ["VALIDITY",`This quotation shall remain valid until 5:00 PM on the above-mentioned date. Notwithstanding the validity period stated herein, prices are subject to adjustment should the London Metal Exchange (LME) copper price exceed USD ${data.csUSD||'13,850'} per metric ton (MT) during the quotation validity period.`],
@@ -916,7 +926,7 @@ const TNC=[
     if(it.drum)drums++;
     const q=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,a=q*p;
     sub+=a;
-    return `<tr><td class="tc">${i+1}</td><td>${getDesc(it)}</td><td class="tc">${escH(it.unit||'meter')}</td><td class="tr">${q}</td><td class="tr">${fmtRMUnit(p)}</td><td class="tr">${fmtRM(a)}</td></tr>`;
+    return `<tr><td class="tc">${i+1}</td><td>${getDesc(it)}</td><td class="tc">${escH(it.unit||'meter')}</td><td class="tr">${q}</td><td class="tr">${fmtRMUnit(p,it)}</td><td class="tr">${fmtRMAmt(a,it)}</td></tr>`;
   });
   if(drums>0){const da=drums*150;sub+=da;rows.push(`<tr><td class="tc">${(data.items||[]).length+1}</td><td>Drum Charges (${drums} drum${drums>1?'s':''})</td><td class="tc">unit</td><td class="tr">${drums}</td><td class="tr">${fmtRM(150)}</td><td class="tr">${fmtRM(da)}</td></tr>`);}
   const sp=data.sst!==false?10:0,sa=sub*sp/100,tr=data.transport||0,tot=sub+sa+tr;
@@ -1062,7 +1072,7 @@ window.savePickCust=function(){
 //  ADD / EDIT ITEM MODAL
 // ══════════════════════════════════════════════════════════════
 let editIdx=-1;
-let curGroup='Copper', curCat='', curSize='', isCustomItem=false;
+let curGroup='Copper', curCat='', curSize='', isCustomItem=false, isFreeRow=false;
 
 // ── Price helpers ─────────────────────────────────────────────
 const CU_TIERS  = ['+3','+2','+1','+0','-1','-2','Below 100m','Below 50m'];
@@ -1089,7 +1099,8 @@ function hasPrices(){ return Object.keys(priceDB()).length>0; }
 function openItemModal(idx){
   editIdx=idx;
   const ex=idx>=0?ST.items[idx]:null;
-  isCustomItem=ex?.isCustom||false;
+  isFreeRow=ex?.isFreeRow||false;
+  isCustomItem=(!isFreeRow)&&(ex?.isCustom||false);
   curGroup=ex?.group||'Copper';
   curCat=ex?.category||'';
   curSize=ex?.size||'';
@@ -1100,8 +1111,8 @@ function renderItemSheet(ex){
   const cc=load('cc',[]);
 
   // Group tabs
-  const gTabs=['Copper','Aluminium','FR Cable'].concat(cc.length?['Custom']:[]).map(g=>`
-    <button class="btn btn-sm ${(!isCustomItem&&curGroup===g)||(isCustomItem&&g==='Custom')?'btn-navy':'btn-grey'}"
+  const gTabs=['Copper','Aluminium','FR Cable'].concat(cc.length?['Custom']:[]).concat(['Free Row']).map(g=>`
+    <button class="btn btn-sm ${(isFreeRow&&g==='Free Row')||(!isFreeRow&&!isCustomItem&&curGroup===g)||(!isFreeRow&&isCustomItem&&g==='Custom')?'btn-navy':'btn-grey'}"
       onclick="switchGroup('${g}')" style="flex:1">${g}</button>`).join('');
 
   // Type options
@@ -1161,13 +1172,19 @@ function renderItemSheet(ex){
         <div style="display:flex;gap:7px;flex-wrap:wrap">${gTabs}</div>
       </div>
 
+      ${isFreeRow?`
+      <!-- Free Row: just description -->
+      <div>
+        <label class="lbl">Description</label>
+        <input class="inp" id="inp-free-desc" placeholder="e.g. Cable tray, Installation fee, Misc charge…" value="${esc(ex?.customName||'')}">
+      </div>`:`
       <!-- Cable type -->
       <div>
         <label class="lbl">${isCustomItem?'Custom Cable':'Cable Type'}</label>
         <select class="inp" id="sel-type" onchange="onTypeChange(this.value)">${catOpts}</select>
-      </div>
+      </div>`}
 
-      ${!isCustomItem?`
+      ${(!isCustomItem&&!isFreeRow)?`
       <!-- Size -->
       <div id="size-row" style="${!curCat?'display:none':''}">
         <label class="lbl">Size</label>
@@ -1265,8 +1282,9 @@ function renderItemSheet(ex){
 }
 
 function switchGroup(g){
-  isCustomItem=(g==='Custom');
-  if(!isCustomItem) curGroup=g;
+  isFreeRow=(g==='Free Row');
+  isCustomItem=(!isFreeRow)&&(g==='Custom');
+  if(!isCustomItem&&!isFreeRow) curGroup=g;
   curCat=''; curSize='';
   renderItemSheet(editIdx>=0?ST.items[editIdx]:null);
 }
@@ -1316,7 +1334,8 @@ function onSizeChange(val){
         const mu=parseFloat($('inp-markup')?.value)||0;
         const disc=parseFloat($('inp-discount')?.value)||0;
         const {price:cv,unit:au}=_pvcConvert(curCat,val,p0);
-        $('inp-price').value=applyDiscount(applyMarkup(cv,mu),disc).toFixed(4);
+        const _fp0=applyDiscount(applyMarkup(cv,mu),disc);const _sm0=_isSmallCable(curSize);
+        $('inp-price').value=(_sm0?_fp0:r05(_fp0)).toFixed(_sm0?4:2);
         _updateMarkupPreview(cv,mu,disc);
         if(au){const us=$('sel-unit');if(us)us.value=au;}
         const lp=$('lbl-price');if(lp)lp.textContent=`Price per ${au||'Meter'} (RM)`;
@@ -1338,7 +1357,8 @@ function onTierChange(val){
     const disc=parseFloat($('inp-discount')?.value)||0;
     const curUnit=$('sel-unit')?.value||'Meter';
     const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-    $('inp-price').value=applyDiscount(applyMarkup(cv,mu),disc).toFixed(4);
+    const _fp=applyDiscount(applyMarkup(cv,mu),disc);const _sm=_isSmallCable(curSize);
+    $('inp-price').value=(_sm?_fp:r05(_fp)).toFixed(_sm?4:2);
     _updateMarkupPreview(cv,mu,disc);
   }
 }
@@ -1352,7 +1372,8 @@ function onMarkupChange(){
   const disc=parseFloat($('inp-discount')?.value)||0;
   const curUnit=$('sel-unit')?.value||'Meter';
   const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-  $('inp-price').value=applyDiscount(applyMarkup(cv,mu),disc).toFixed(4);
+  const _fp=applyDiscount(applyMarkup(cv,mu),disc);const _sm=_isSmallCable(curSize);
+  $('inp-price').value=(_sm?_fp:r05(_fp)).toFixed(_sm?4:2);
   _updateMarkupPreview(cv,mu,disc);
 }
 
@@ -1365,7 +1386,8 @@ function onDiscountChange(){
   const disc=parseFloat($('inp-discount')?.value)||0;
   const curUnit=$('sel-unit')?.value||'Meter';
   const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-  $('inp-price').value=applyDiscount(applyMarkup(cv,mu),disc).toFixed(4);
+  const _fp=applyDiscount(applyMarkup(cv,mu),disc);const _sm=_isSmallCable(curSize);
+  $('inp-price').value=(_sm?_fp:r05(_fp)).toFixed(_sm?4:2);
   _updateMarkupPreview(cv,mu,disc);
 }
 
@@ -1379,18 +1401,22 @@ function onUnitChange(val){
   const mu=parseFloat($('inp-markup')?.value)||0;
   const disc=parseFloat($('inp-discount')?.value)||0;
   const cv=_pvcPriceFor(curCat,curSize,base,val);
-  $('inp-price').value=applyDiscount(applyMarkup(cv,mu),disc).toFixed(4);
+  const _fp=applyDiscount(applyMarkup(cv,mu),disc);const _sm=_isSmallCable(curSize);
+  $('inp-price').value=(_sm?_fp:r05(_fp)).toFixed(_sm?4:2);
   _updateMarkupPreview(cv,mu,disc);
   const lp=$('lbl-price');if(lp)lp.textContent=`Price per ${val} (RM)`;
 }
 
 function _buildMarkupPreviewText(base,mu,disc){
   if(mu<=0&&disc<=0) return '';
+  const small=_isSmallCable(curSize);
   const marked=applyMarkup(base,mu);
-  const final=applyDiscount(marked,disc);
+  const rawFinal=applyDiscount(marked,disc);
+  const final=small?rawFinal:r05(rawFinal);
   let t=`RM${Number(base).toFixed(4)}`;
-  if(mu>0) t+=` +${mu}% → RM${Number(marked).toFixed(4)}`;
-  if(disc>0) t+=` −${disc}% → RM${Number(final).toFixed(4)}`;
+  if(mu>0&&disc>0) t+=` +${mu}% → RM${Number(marked).toFixed(4)} −${disc}% → RM${Number(final).toFixed(4)}`;
+  else if(mu>0)    t+=` +${mu}% → RM${Number(final).toFixed(4)}`;
+  else             t+=` −${disc}% → RM${Number(final).toFixed(4)}`;
   return t;
 }
 function _updateMarkupPreview(base,mu,disc=0){
@@ -1424,13 +1450,17 @@ function saveItem(){
   const drum=$('chk-drum')?.checked||false;
   const remarks=$('inp-rem')?.value?.trim()||'';
 
-  if(!typeVal){toast('Select a cable type');return;}
-  if(!isCC&&!size){toast('Select a size');return;}
+  if(!isFreeRow&&!typeVal){toast('Select a cable type');return;}
+  if(!isFreeRow&&!isCC&&!size){toast('Select a size');return;}
   if(!price||price<=0){toast('Enter a price');return;}
   if(!qty||qty<1){toast('Enter a quantity');return;}
 
   let item;
-  if(isCC){
+  if(isFreeRow){
+    const freeDesc=($('inp-free-desc')?.value?.trim())||'';
+    if(!freeDesc){toast('Enter a description');return;}
+    item={isCustom:true,isFreeRow:true,customName:freeDesc,price,qty,unit,stock,drum,remarks,waDesc:freeDesc};
+  } else if(isCC){
     const ccIdx=parseInt(typeVal.replace('CC:',''));
     const cc=load('cc',[])[ccIdx]||{};
     item={isCustom:true,customName:cc.name||'',customIdx:ccIdx,price,qty,unit,stock,drum,remarks,waDesc:cc.waDesc||cc.name||''};
