@@ -1244,9 +1244,14 @@ function populateFromMobileApp(fromButton) {
           : 'Power Cable compliant with MS2107/IEC60502-1';
         if (inselEl && (isPSP4 || szN4 <= 10)) inselEl.value = 'PVC/PVC/SWA/PVC';
       }
-      // ALU 4c Armoured: insulation depends on PSP
+      // ALU 4c Armoured: 16mm²/25mm² are only manufactured/priced as PSP (PVC insulated) —
+      // no separate XLPE variant exists at those sizes, unlike copper.
       if (it.category === 'ALU/XLPE/SWA/PVC 4c' && inselEl) {
-        if (String(it.size || '').indexOf('(PSP)') !== -1) inselEl.value = 'PVC/PVC/SWA/PVC';
+        var rawSzA4 = String(it.size || '');
+        var isPSPA4 = rawSzA4.indexOf('(PSP)') !== -1;
+        var szMA4   = rawSzA4.match(/^([\d.]+)/);
+        var szNA4   = szMA4 ? parseFloat(szMA4[1]) : 999;
+        if (isPSPA4 || szNA4 <= 25) inselEl.value = 'PVC/PVC/SWA/PVC';
       }
       // Build description from dropdowns, then append remarks/drum tag
       buildDesc(id);
