@@ -524,11 +524,13 @@ const rmPrice=n=>{n=+n;let s=n.toFixed(3);if(s.endsWith('0'))s=s.slice(0,-1);if(
 const rmPrice3=n=>{n=+n;return n.toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g,',');};
 function _showPrice3dp(it){if(!it||it.isCustom)return false;const sz=parseFloat(it.size);return sz>=1.5&&sz<=4&&(it.unit||'Meter')==='Meter'&&(it.category||'').includes('PVC');}
 function _isSmallCable(sz){const s=parseFloat(sz);return s>=1.5&&s<=4;}
-// Format a unit price for display: PVC 1.5-4mm/meter→3dp, other 1.5-4mm→2dp, large→2dp rounded to 0.05
+// Format a unit price for display: PVC 1.5-4mm/meter→3dp, everything else→2dp.
+// Always formats the item's actual saved/entered price as-is — auto-computed prices are
+// already rounded to RM0.05 when they're first calculated, so re-rounding here would only
+// ever distort a price the user typed in manually (e.g. 3.43 silently showing as 3.45).
 function _fmtPriceNum(it,n){
   if(_showPrice3dp(it)) return rmPrice3(n);
-  if(it&&!it.isCustom&&_isSmallCable(it.size)) return rm(n);
-  return rm(r05(n));
+  return rm(n);
 }
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const ini=n=>(n||'?').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
