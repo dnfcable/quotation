@@ -440,9 +440,10 @@ const CABLE_TYPES = {
   "CU/Mica/XLPE/PVC-FR":    {label:"CU/Mica/XLPE/PVC FR",         cores:"1c"},
   "CU/Mica/XLPE/LSZH":      {label:"CU/Mica/XLPE/LSZH FR",        cores:"1c"},
   "CU/Mica/XLPO-LSZH":      {label:"CU/Mica/XLPO/LSZH FR",        cores:"1c"},
+  "Copper Tape":            {label:"Copper Tape",                  cores:""},
 };
 const GROUPS = {
-  "Copper":     ["CU/PVC 1c","CU/XLPE/PVC 1c","CU/XLPE/PVC 2c","CU/PVC/PVC 2c","CU/XLPE/PVC 3c","CU/PVC/PVC 3c","CU/XLPE/PVC 4c","CU/PVC/PVC 4c","CU 4c Armoured","CU/PVC/SWA/PVC 2c","CU/PVC/SWA/PVC 3c","CU Arm Multicore 1.5mm²","CU Arm Multicore 2.5mm²"],
+  "Copper":     ["CU/PVC 1c","CU/XLPE/PVC 1c","CU/XLPE/PVC 2c","CU/PVC/PVC 2c","CU/XLPE/PVC 3c","CU/PVC/PVC 3c","CU/XLPE/PVC 4c","CU/PVC/PVC 4c","CU 4c Armoured","CU/PVC/SWA/PVC 2c","CU/PVC/SWA/PVC 3c","CU Arm Multicore 1.5mm²","CU Arm Multicore 2.5mm²","Copper Tape"],
   "Aluminium":  ["ALU/PVC 1c","ALU/XLPE/PVC 1c","ALU/XLPE/SWA/PVC 2c","ALU/XLPE/SWA/PVC 3c","ALU/XLPE/SWA/PVC 4c"],
   "FR Cable":   ["CU/Mica/PVC-FR","CU/Mica/XLPE/PVC-FR","CU/Mica/XLPE/LSZH","CU/Mica/XLPO-LSZH"],
 };
@@ -454,6 +455,7 @@ const SIZES_NX  = ["1.5mm²","2.5mm²","4mm²","6mm²","10mm²","16mm²","25mm²
 const SIZES_ALU = ["16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²","500mm²","630mm²"];
 const SIZES_ALA = ["16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²"];
 const SIZES_ALA4= ["16mm²","25mm²","35mm²","50mm²","70mm²","95mm²","120mm²","150mm²","185mm²","240mm²","300mm²","400mm²"];
+const SIZES_TAPE = ["25mm x 3mm","25mm x 6mm","50mm x 6mm"];
 const COLOURS   = ["","Black","Red","Yellow","Blue","Green","Brown","Grey","White","Orange","Green/Yellow"];
 const UNITS     = ["Meter","Coil","Drum","Roll","Set","Nos","Length"];
 const DRUM_PRICE = 150;
@@ -489,6 +491,7 @@ function sizesFor(cat){
   if(cat==='ALU/XLPE/SWA/PVC 4c') return SIZES_ALA4;
   if(cat.startsWith("ALU/XLPE/SWA")) return SIZES_ALA;
   if(cat.includes("/Mica/")) return SIZES_1C;
+  if(cat==='Copper Tape') return SIZES_TAPE;
   return SIZES_NX;
 }
 
@@ -614,7 +617,7 @@ function renderQuote(){
           <div class="item-num">${i+1}</div>
           <div class="item-mid">
             <div class="item-desc">${esc(desc)}</div>
-            <div class="item-cat">${esc(cat)}${it.tier?` <span style="font-size:11px;color:#718096">· ${it.tier}${it.markup>0?` <span style="background:#ebf4ff;color:#2b6cb0;padding:1px 5px;border-radius:6px;margin-left:2px">+${it.markup}%</span>`:''}${it.discount>0?` <span style="background:#fff5f5;color:#c53030;padding:1px 5px;border-radius:6px;margin-left:2px">−${it.discount}%</span>`:''}</span>`:''} &nbsp;<span class="stock ${scls}">${stxt}</span>${it.drum?' 🥁':''}</div>
+            <div class="item-cat">${esc(cat)}${it.tier?` <span style="font-size:11px;color:#718096">· ${it.tier}${it.markup>0?` <span style="background:#ebf4ff;color:#2b6cb0;padding:1px 5px;border-radius:6px;margin-left:2px">+${it.markup}${it.markupMode==='rmkg'?'/kg':'%'}</span>`:''}${it.discount>0?` <span style="background:#fff5f5;color:#c53030;padding:1px 5px;border-radius:6px;margin-left:2px">−${it.discount}${it.markupMode==='rmkg'?'/kg':'%'}</span>`:''}</span>`:''} &nbsp;<span class="stock ${scls}">${stxt}</span>${it.drum?' 🥁':''}</div>
           </div>
           <div class="item-right">
             <div class="item-amt">RM ${_showPrice3dp(it)?rmPrice3(amt):rm(amt)}</div>
@@ -906,7 +909,8 @@ const TNC=[
     'CU/Mica/PVC-FR':         {cn:'CU/MICA/',ins:'XLPE/PVC-FR',       rt:'450/750V', st:''},
     'CU/Mica/XLPE/PVC-FR':    {cn:'CU/MICA/',ins:'XLPE/PVC-FR',       rt:'0.6/1kV', st:'Power Cable compliant with MS2104/IEC60502-1/IEC60332-3-22/BS6387'},
     'CU/Mica/XLPE/LSZH':      {cn:'CU/MICA/',ins:'XLPE/LSZH',         rt:'0.6/1kV', st:'Power Cable compliant with MS2104/IEC60502-1/IEC60332-3-22/BS6387'},
-    'CU/Mica/XLPO-LSZH':      {cn:'CU/MICA/',ins:'LSZH/LSZH',         rt:'0.6/1kV', st:'Power Cable compliant with MS2104/IEC60502-1/IEC60332-3-22/BS6387'}
+    'CU/Mica/XLPO-LSZH':      {cn:'CU/MICA/',ins:'LSZH/LSZH',         rt:'0.6/1kV', st:'Power Cable compliant with MS2104/IEC60502-1/IEC60332-3-22/BS6387'},
+    'Copper Tape':            {cn:'Copper Tape', ins:'', rt:''}
   };
   function getDesc(it){
     if(it.isCustom) return escH(it.waDesc||it.customName||'');
@@ -1099,14 +1103,24 @@ let curGroup='Copper', curCat='', curSize='', isCustomItem=false, isFreeRow=fals
 // True once the user has typed into the Price field themselves for the item currently
 // being edited — while true, tier/markup/discount/unit changes must not overwrite it.
 let priceEdited=false;
+// Copper Tape only: whether Markup/Discount are entered as a percentage (like every other
+// cable type) or as a flat RM/KG amount added to the underlying commodity price. Restored
+// from the item's saved `markupMode` when editing, defaults to '%' for a fresh item.
+let tapeMarkupMode='pct';
 
 // ── Price helpers ─────────────────────────────────────────────
 const CU_TIERS  = ['+3','+2','+1','+0','-1','-2','Below 100m','Below 50m'];
 const ALU_TIERS = ['+3','+2','+1','+0','-1','-2','-3','Below 200m','Below 100m'];
 const FR_TIERS  = ['+3','+2','+1','+0','-1','-2'];
+// Copper Tape has no tier system — one flat RM/KG price, same for every size — so it's
+// modelled as a single pseudo-"tier". Named 'Rate' (not e.g. 'Coil') because this value
+// is visible to the user on the item card (next to the cable type, like "· Rate +2/kg"),
+// and the whole point of this feature is that Copper Tape has nothing to do with coils.
+const TAPE_TIERS = ['Rate'];
 function tiersFor(cat){
   const ut=load('userCableTypes',[]).find(t=>t.key===cat);
   if(ut) return ut.tiersGroup==='alu'?ALU_TIERS:ut.tiersGroup==='fr'?FR_TIERS:CU_TIERS;
+  if(cat==='Copper Tape') return TAPE_TIERS;
   return cat.startsWith('ALU')?ALU_TIERS:cat.includes('/Mica/')?FR_TIERS:CU_TIERS;
 }
 function priceDB(){ return load('prices',{date:'',prices:{}}).prices||{}; }
@@ -1131,7 +1145,41 @@ function openItemModal(idx){
   curCat=ex?.category||'';
   curSize=ex?.size||'';
   priceEdited=false;
+  tapeMarkupMode=ex?.markupMode==='rmkg'?'rmkg':'pct';
   renderItemSheet(ex);
+}
+
+// Builds the Markup/Discount block's inner HTML — a function rather than inline markup so
+// onTypeChange() can rebuild it too when curCat changes without a full sheet re-render.
+function _renderMarkupRow(markupVal,discountVal,previewText){
+  const isTape=curCat==='Copper Tape';
+  const tapeRmKg=isTape && tapeMarkupMode==='rmkg';
+  return `${isTape?`
+    <div id="tape-mode-row" style="display:flex;gap:6px;margin-bottom:8px">
+      <button type="button" class="btn btn-sm ${!tapeRmKg?'btn-navy':'btn-grey'}" id="btn-mode-pct" onclick="setTapeMarkupMode('pct')" style="flex:1">%</button>
+      <button type="button" class="btn btn-sm ${tapeRmKg?'btn-navy':'btn-grey'}" id="btn-mode-rmkg" onclick="setTapeMarkupMode('rmkg')" style="flex:1">RM/KG</button>
+    </div>`:''}
+    <div style="display:flex;gap:10px">
+      <div style="flex:1">
+        <label class="lbl" id="lbl-markup">${tapeRmKg?'Markup (RM/KG)':'Markup %'}</label>
+        <div style="position:relative">
+          <input class="inp" id="inp-markup" type="number" step="${tapeRmKg?'0.01':'0.5'}" min="0"
+                 placeholder="0" value="${markupVal||''}" oninput="onMarkupChange()"
+                 style="padding-right:30px">
+          <span id="unit-markup" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#718096;pointer-events:none;font-size:14px">${tapeRmKg?'RM':'%'}</span>
+        </div>
+      </div>
+      <div id="discount-row" style="flex:1">
+        <label class="lbl" id="lbl-discount">${tapeRmKg?'Discount (RM/KG)':'Discount %'}</label>
+        <div style="position:relative">
+          <input class="inp" id="inp-discount" type="number" step="${tapeRmKg?'0.01':'0.5'}" min="0" ${tapeRmKg?'':'max="100"'}
+                 placeholder="0" value="${discountVal||''}" oninput="onDiscountChange()"
+                 style="padding-right:30px">
+          <span id="unit-discount" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#718096;pointer-events:none;font-size:14px">${tapeRmKg?'RM':'%'}</span>
+        </div>
+      </div>
+    </div>
+    <div id="markup-preview" style="font-size:12px;color:#276749;margin-top:5px">${previewText||''}</div>`;
 }
 
 function renderItemSheet(ex){
@@ -1157,33 +1205,55 @@ function renderItemSheet(ex){
   const sizes=(!isCustomItem&&curCat)?sizesFor(curCat):[];
   const sizeOpts='<option value="">— Select size —</option>'+sizes.map(s=>`<option value="${esc(s)}" ${s===curSize?'selected':''}>${esc(s)}</option>`).join('');
 
+  const isTape = curCat==='Copper Tape';
+
   // Tier options — only shown when a price file is loaded AND cat+size selected
   const tierData = (!isCustomItem&&curCat&&curSize) ? lookupTiers(curCat,curSize) : {};
   const tiers    = (!isCustomItem&&curCat) ? tiersFor(curCat) : [];
   const showTiers = hasPrices() && !isCustomItem && curCat && curSize;
+  const defTier = tiers.includes('+0') ? '+0' : (tiers[0]||'+0');
   const tierOpts = tiers.map(t=>{
-    const p=tierData[t];
-    const lbl = p!=null ? `${t}  →  RM ${Number(p).toFixed(4)}` : `${t}`;
-    return `<option value="${esc(t)}" ${t===(ex?.tier||'+0')?'selected':''}>${lbl}</option>`;
+    // Copper Tape has no tiers — its single pseudo-tier shows the RM/KG commodity price.
+    const lbl = isTape ? (tierData.perKg!=null?`Cu Tape Price  →  RM ${Number(tierData.perKg).toFixed(4)} /KG`:'Cu Tape Price')
+      : (tierData[t]!=null?`${t}  →  RM ${Number(tierData[t]).toFixed(4)}`:`${t}`);
+    return `<option value="${esc(t)}" ${t===(ex?.tier||defTier)?'selected':''}>${lbl}</option>`;
   }).join('');
 
-  // Markup % — from existing item or global default in settings
-  const markup = ex?.markup!=null ? ex.markup : (settings().markup||0);
+  // Copper Tape can use either plain % (like every other type) or a flat RM/KG amount —
+  // the user picks which via a small toggle in the sheet; tapeRmKg is that resolved choice.
+  const tapeRmKg = isTape && tapeMarkupMode==='rmkg';
+
+  // Markup/Discount — from existing item or global % default (RM/KG mode always starts at 0;
+  // the global default is a percentage and means nothing as an RM/KG figure).
+  const markup = ex?.markup!=null ? ex.markup : (tapeRmKg?0:(settings().markup||0));
   const discount = ex?.discount!=null ? ex.discount : 0;
 
-  // Price: tier base → PVC conversion → markup → discount → final
-  // Determine unit first (saved unit wins; fall back to auto-detect)
-  const rawBase = (ex?.tier && tierData[ex.tier]!=null) ? tierData[ex.tier] : null;
-  const {unit:autoUnit} = rawBase!=null ? _pvcConvert(curCat,curSize,rawBase) : {unit:null};
-  const unit = ex?.unit||(autoUnit||'Meter');
-  // Convert using the resolved unit so price label matches
-  const basePrice = rawBase!=null ? _pvcPriceFor(curCat,curSize,rawBase,unit) : null;
-  // Editing an existing item: show its saved price as-is — it may have been manually
-  // overridden by the user, so don't silently recompute it from the tier and discard that.
-  const autoPrice = ex ? (ex.price??'') : (basePrice!=null ? applyDiscount(applyMarkup(basePrice,markup),discount) : '');
-  const markupPreview = (basePrice!=null && (markup>0||discount>0))
-    ? _buildMarkupPreviewText(basePrice,markup,discount)
-    : '';
+  // Price: tier base → PVC conversion → markup → discount → final. For Copper Tape the
+  // "tier base" is its RM/KG rate directly (no coil weight involved anywhere) — quantity
+  // is entered in KG, so price(RM/KG) × qty(KG) already gives the right amount everywhere
+  // downstream (item list, WA message, printed quote) with no special-casing needed there.
+  const rawBase = isTape
+    ? (tierData.perKg!=null ? tierData.perKg : null)
+    : ((ex?.tier && tierData[ex.tier]!=null) ? tierData[ex.tier] : null);
+  const {unit:autoUnit} = (rawBase!=null && !isTape) ? _pvcConvert(curCat,curSize,rawBase) : {unit:null};
+  const unit = ex?.unit||(autoUnit||(isTape?'KG':'Meter'));
+  let basePrice, autoPrice, markupPreview;
+  if(tapeRmKg){
+    basePrice = rawBase;
+    const finalPerKg = rawBase!=null ? _tapeRmKgFinal(rawBase,markup,discount) : null;
+    autoPrice = ex ? (ex.price??'') : (finalPerKg!=null ? finalPerKg : '');
+    markupPreview = (finalPerKg!=null && (markup>0||discount>0)) ? _tapePreviewText(rawBase,markup,discount,finalPerKg) : '';
+  } else {
+    // Convert using the resolved unit so price label matches (a no-op for Copper Tape —
+    // _pvcPriceFor only special-cases CU/PVC 1c, so rawBase/perKg passes straight through)
+    basePrice = rawBase!=null ? _pvcPriceFor(curCat,curSize,rawBase,unit) : null;
+    // Editing an existing item: show its saved price as-is — it may have been manually
+    // overridden by the user, so don't silently recompute it from the tier and discard that.
+    autoPrice = ex ? (ex.price??'') : (basePrice!=null ? applyDiscount(applyMarkup(basePrice,markup),discount) : '');
+    markupPreview = (basePrice!=null && (markup>0||discount>0))
+      ? _buildMarkupPreviewText(basePrice,markup,discount)
+      : '';
+  }
   const p = autoPrice!==''&&autoPrice!=null ? Number(autoPrice).toFixed(4) : '';
   const q = ex?.qty||'';
 
@@ -1219,8 +1289,10 @@ function renderItemSheet(ex){
         <select class="inp" id="sel-size" onchange="onSizeChange(this.value)">${sizeOpts}</select>
       </div>
 
-      <!-- Colour -->
-      <div>
+      <!-- Colour — hidden (not shown/toggled by display) for Copper Tape, matching how
+           tier-row/markup-row visibility is already handled so onTypeChange/onSizeChange
+           can flip it via style.display without needing a full sheet re-render. -->
+      <div id="colour-row" style="${isTape?'display:none':''}">
         <label class="lbl">Colour (optional)</label>
         <select class="inp" id="sel-colour">${COLOURS.map(c=>`<option value="${esc(c)}" ${c===(ex?.colour||'')?'selected':''}>${c||'— None —'}</option>`).join('')}</select>
       </div>
@@ -1231,30 +1303,11 @@ function renderItemSheet(ex){
         <select class="inp" id="sel-tier" onchange="onTierChange(this.value)">${tierOpts}</select>
       </div>
 
-      <!-- Markup % + Discount % side by side -->
-      <div id="markup-row" style="${showTiers?'':'display:none'}">
-        <div style="display:flex;gap:10px">
-          <div style="flex:1">
-            <label class="lbl">Markup %</label>
-            <div style="position:relative">
-              <input class="inp" id="inp-markup" type="number" step="0.5" min="0"
-                     placeholder="0" value="${markup||''}" oninput="onMarkupChange()"
-                     style="padding-right:30px">
-              <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#718096;pointer-events:none;font-size:14px">%</span>
-            </div>
-          </div>
-          <div id="discount-row" style="flex:1">
-            <label class="lbl">Discount %</label>
-            <div style="position:relative">
-              <input class="inp" id="inp-discount" type="number" step="0.5" min="0" max="100"
-                     placeholder="0" value="${discount||''}" oninput="onDiscountChange()"
-                     style="padding-right:30px">
-              <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#718096;pointer-events:none;font-size:14px">%</span>
-            </div>
-          </div>
-        </div>
-        <div id="markup-preview" style="font-size:12px;color:#276749;margin-top:5px">${markupPreview}</div>
-      </div>`:''}
+      <!-- Markup + Discount — % for every cable type; Copper Tape can also switch to a flat
+           RM/KG amount via a toggle. Content built by _renderMarkupRow() so onTypeChange can
+           rebuild it too (a brand-new item's initial render here has curCat==='', so this
+           content must be refreshed once the user actually picks Copper Tape). -->
+      <div id="markup-row" style="${showTiers?'':'display:none'}">${_renderMarkupRow(markup,discount,markupPreview)}</div>`:''}
 
       <!-- Price hint -->
       <div id="price-hint">${(!isCustomItem&&(showTiers||!hasPrices()))?pHint:''}</div>
@@ -1266,15 +1319,16 @@ function renderItemSheet(ex){
           <input class="inp" id="inp-price" type="number" step="0.0001" min="0" placeholder="0.0000" value="${p!=null&&p!==''?p:''}" oninput="priceEdited=true">
         </div>
         <div>
-          <label class="lbl">Quantity</label>
-          <input class="inp" id="inp-qty" type="number" step="1" min="1" placeholder="1" value="${q}">
+          <label class="lbl" id="lbl-qty">Quantity${isTape?' (KG)':''}</label>
+          <input class="inp" id="inp-qty" type="number" step="${isTape?'0.01':'1'}" min="${isTape?'0.01':'1'}" placeholder="1" value="${q}">
         </div>
       </div>
 
-      <!-- Unit -->
+      <!-- Unit — Copper Tape is sold and priced purely by weight, so quantity is entered
+           in KG directly; restrict the choices instead of just defaulting them. -->
       <div>
         <label class="lbl">Unit</label>
-        <select class="inp" id="sel-unit" onchange="onUnitChange(this.value)">${UNITS.map(u=>`<option ${u===unit?'selected':''}>${u}</option>`).join('')}</select>
+        <select class="inp" id="sel-unit" onchange="onUnitChange(this.value)">${(curCat==='Copper Tape'?['KG']:UNITS).map(u=>`<option ${u===unit?'selected':''}>${u}</option>`).join('')}</select>
       </div>
 
       <!-- Stock + Drum -->
@@ -1318,10 +1372,24 @@ function switchGroup(g){
   renderItemSheet(editIdx>=0?ST.items[editIdx]:null);
 }
 
+// Copper Tape's item sheet differs from every other type (no Colour, markup/discount mode
+// toggle) — called whenever the selected type could have changed, so those parts stay in
+// sync without a full re-render (which would lose whatever the user already typed into
+// Quantity/Remarks/etc).
+function _applyTapeUiMode(){
+  const isTape=curCat==='Copper Tape';
+  const cr=$('colour-row'); if(cr) cr.style.display=isTape?'none':'';
+  const mr=$('markup-row'); if(mr) mr.innerHTML=_renderMarkupRow(0,0,'');
+  const qi=$('inp-qty'); if(qi){ qi.step=isTape?'0.01':'1'; qi.min=isTape?'0.01':'1'; }
+  const ql=$('lbl-qty'); if(ql) ql.textContent=isTape?'Quantity (KG)':'Quantity';
+}
+
 function onTypeChange(val){
   if(isCustomItem){curCat=val;return;}
   curCat=val; curSize='';
   priceEdited=false;
+  tapeMarkupMode='pct';
+  _applyTapeUiMode();
   const sr=$('size-row'); if(sr) sr.style.display=val?'':'none';
   const ss=$('sel-size'); if(!ss)return;
   const sz=val?sizesFor(val):[];
@@ -1345,31 +1413,50 @@ function onSizeChange(val){
     else toast(`⚠️ Size "${val}" not found in "${curCat}" (${nSizes} sizes in DB). Check Excel file.`,5000);
   }
   const tiers=tiersFor(curCat);
+  const defTier=tiers.includes('+0')?'+0':(tiers[0]||'+0');
   const tr=$('tier-row');
   const mr=$('markup-row');
   const dr=$('discount-row');
+  // Keep the Unit dropdown's own option list in sync with the selected cable type —
+  // Copper Tape is priced and quantified purely by weight, in KG.
+  const usel=$('sel-unit');
+  if(usel){
+    const allowedUnits=curCat==='Copper Tape'?['KG']:UNITS;
+    const keepVal=allowedUnits.includes(usel.value)?usel.value:allowedUnits[0];
+    usel.innerHTML=allowedUnits.map(u=>`<option ${u===keepVal?'selected':''}>${u}</option>`).join('');
+  }
+  const isTape=curCat==='Copper Tape';
+  const tapeRmKg=isTape && tapeMarkupMode==='rmkg';
   if(hasPrices()&&val&&curCat){
     if(tr){
       const tierOpts=tiers.map(t=>{
-        const p=tierData[t];
-        const lbl=p!=null?`${t}  →  RM ${Number(p).toFixed(4)}`:t;
-        return `<option value="${esc(t)}" ${t==='+0'?'selected':''}>${lbl}</option>`;
+        const lbl=isTape ? (tierData.perKg!=null?`Cu Tape Price  →  RM ${Number(tierData.perKg).toFixed(4)} /KG`:'Cu Tape Price')
+          : (tierData[t]!=null?`${t}  →  RM ${Number(tierData[t]).toFixed(4)}`:t);
+        return `<option value="${esc(t)}" ${t===defTier?'selected':''}>${lbl}</option>`;
       }).join('');
       $('sel-tier').innerHTML=tierOpts;
       tr.style.display='';
       if(mr) mr.style.display='';
       if(dr) dr.style.display='';
-      // Auto-fill +0 price with PVC conversion + markup + discount applied
-      const p0=tierData['+0'];
+      // Auto-fill default-tier price with PVC conversion + markup % + discount % applied
+      // (Copper Tape's "tier base" is its RM/KG rate directly, no coil conversion at all).
+      const p0=isTape ? tierData.perKg : tierData[defTier];
       if(p0!=null){
         const mu=parseFloat($('inp-markup')?.value)||0;
         const disc=parseFloat($('inp-discount')?.value)||0;
-        const {price:cv,unit:au}=_pvcConvert(curCat,val,p0);
-        const _fp0=applyDiscount(applyMarkup(cv,mu),disc);const _sm0=_isSmallCable(curSize);
-        $('inp-price').value=(_sm0?_fp0:r05(_fp0)).toFixed(_sm0?4:2);
-        _updateMarkupPreview(cv,mu,disc);
-        if(au){const us=$('sel-unit');if(us)us.value=au;}
-        const lp=$('lbl-price');if(lp)lp.textContent=`Price per ${au||'Meter'} (RM)`;
+        if(tapeRmKg){
+          const finalP=_tapeRmKgFinal(p0,mu,disc);
+          $('inp-price').value=finalP.toFixed(2);
+          const mpEl=$('markup-preview'); if(mpEl) mpEl.textContent=_tapePreviewText(p0,mu,disc,finalP);
+        } else {
+          const {price:cv,unit:au}=_pvcConvert(curCat,val,p0);
+          const _fp0=applyDiscount(applyMarkup(cv,mu),disc);const _sm0=_isSmallCable(curSize);
+          $('inp-price').value=(_sm0?_fp0:r05(_fp0)).toFixed(_sm0?4:2);
+          _updateMarkupPreview(cv,mu,disc);
+          const forcedUnit=isTape?'KG':au;
+          if(forcedUnit){const us2=$('sel-unit');if(us2)us2.value=forcedUnit;}
+          const lp=$('lbl-price');if(lp)lp.textContent=`Price per ${forcedUnit||'Meter'} (RM)`;
+        }
       }
     }
     $('price-hint').innerHTML='';
@@ -1382,47 +1469,78 @@ function onSizeChange(val){
 }
 
 function onTierChange(val){
-  const base=lookupTiers(curCat,curSize)[val];
+  const isTape=curCat==='Copper Tape';
+  const base=isTape ? lookupTiers('Copper Tape',curSize).perKg : lookupTiers(curCat,curSize)[val];
   if(base!=null){
     const mu=parseFloat($('inp-markup')?.value)||0;
     const disc=parseFloat($('inp-discount')?.value)||0;
-    const curUnit=$('sel-unit')?.value||'Meter';
-    const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-    const _fp=applyDiscount(applyMarkup(cv,mu),disc);const _sm=_isSmallCable(curSize);
     // Picking a different tier is a deliberate request for that tier's price —
     // it's allowed to overwrite a manual edit; anything typed before is superseded.
     priceEdited=false;
-    $('inp-price').value=(_sm?_fp:r05(_fp)).toFixed(_sm?4:2);
-    _updateMarkupPreview(cv,mu,disc);
+    if(isTape && tapeMarkupMode==='rmkg'){
+      const finalP=_tapeRmKgFinal(base,mu,disc);
+      $('inp-price').value=finalP.toFixed(2);
+      const mpEl=$('markup-preview'); if(mpEl) mpEl.textContent=_tapePreviewText(base,mu,disc,finalP);
+    } else {
+      const curUnit=$('sel-unit')?.value||'Meter';
+      const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
+      const _fp=applyDiscount(applyMarkup(cv,mu),disc);const _sm=_isSmallCable(curSize);
+      $('inp-price').value=(_sm?_fp:r05(_fp)).toFixed(_sm?4:2);
+      _updateMarkupPreview(cv,mu,disc);
+    }
   }
 }
 
 function onMarkupChange(){
   const tier=$('sel-tier')?.value;
   if(!tier||!curSize||!curCat) return;
-  const base=lookupTiers(curCat,curSize)[tier];
+  const isTape=curCat==='Copper Tape';
+  const base=isTape ? lookupTiers('Copper Tape',curSize).perKg : lookupTiers(curCat,curSize)[tier];
   if(base==null) return;
   const mu=parseFloat($('inp-markup')?.value)||0;
   const disc=parseFloat($('inp-discount')?.value)||0;
-  const curUnit=$('sel-unit')?.value||'Meter';
-  const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-  const _fp=applyDiscount(applyMarkup(cv,mu),disc);const _sm=_isSmallCable(curSize);
-  if(!priceEdited) $('inp-price').value=(_sm?_fp:r05(_fp)).toFixed(_sm?4:2);
-  _updateMarkupPreview(cv,mu,disc);
+  if(isTape && tapeMarkupMode==='rmkg'){
+    const finalP=_tapeRmKgFinal(base,mu,disc);
+    if(!priceEdited) $('inp-price').value=finalP.toFixed(2);
+    const mpEl=$('markup-preview'); if(mpEl) mpEl.textContent=_tapePreviewText(base,mu,disc,finalP);
+  } else {
+    const curUnit=$('sel-unit')?.value||'Meter';
+    const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
+    const _fp=applyDiscount(applyMarkup(cv,mu),disc);const _sm=_isSmallCable(curSize);
+    if(!priceEdited) $('inp-price').value=(_sm?_fp:r05(_fp)).toFixed(_sm?4:2);
+    _updateMarkupPreview(cv,mu,disc);
+  }
 }
 
 function onDiscountChange(){
   const tier=$('sel-tier')?.value;
   if(!tier||!curSize||!curCat) return;
-  const base=lookupTiers(curCat,curSize)[tier];
+  const isTape=curCat==='Copper Tape';
+  const base=isTape ? lookupTiers('Copper Tape',curSize).perKg : lookupTiers(curCat,curSize)[tier];
   if(base==null) return;
   const mu=parseFloat($('inp-markup')?.value)||0;
   const disc=parseFloat($('inp-discount')?.value)||0;
-  const curUnit=$('sel-unit')?.value||'Meter';
-  const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
-  const _fp=applyDiscount(applyMarkup(cv,mu),disc);const _sm=_isSmallCable(curSize);
-  if(!priceEdited) $('inp-price').value=(_sm?_fp:r05(_fp)).toFixed(_sm?4:2);
-  _updateMarkupPreview(cv,mu,disc);
+  if(isTape && tapeMarkupMode==='rmkg'){
+    const finalP=_tapeRmKgFinal(base,mu,disc);
+    if(!priceEdited) $('inp-price').value=finalP.toFixed(2);
+    const mpEl=$('markup-preview'); if(mpEl) mpEl.textContent=_tapePreviewText(base,mu,disc,finalP);
+  } else {
+    const curUnit=$('sel-unit')?.value||'Meter';
+    const cv=_pvcPriceFor(curCat,curSize,base,curUnit);
+    const _fp=applyDiscount(applyMarkup(cv,mu),disc);const _sm=_isSmallCable(curSize);
+    if(!priceEdited) $('inp-price').value=(_sm?_fp:r05(_fp)).toFixed(_sm?4:2);
+    _updateMarkupPreview(cv,mu,disc);
+  }
+}
+
+// Copper Tape only: switch between % and RM/KG markup/discount. Resets both fields to 0
+// (their units differ, so carrying a number across modes would be meaningless) and
+// recomputes the price for the new mode.
+function setTapeMarkupMode(mode){
+  tapeMarkupMode=mode;
+  const mr=$('markup-row'); if(mr) mr.innerHTML=_renderMarkupRow(0,0,'');
+  priceEdited=false;
+  onMarkupChange();
 }
 
 // Called when the Unit dropdown changes — recalculates price for CU/PVC 1c
@@ -1441,6 +1559,20 @@ function onUnitChange(val){
   const lp=$('lbl-price');if(lp)lp.textContent=`Price per ${val} (RM)`;
 }
 
+// Copper Tape RM/KG mode: flat markup/discount added directly to the base per-KG price —
+// additive, not the %-based applyMarkup()/applyDiscount() every other mode (and Copper
+// Tape's own % mode, which reuses those functions with perKg as the base) uses.
+function _tapeRmKgFinal(perKg,mu,disc){
+  return Math.max(0, perKg+(mu||0)-(disc||0));
+}
+function _tapePreviewText(perKg,mu,disc,finalPerKg){
+  if(mu<=0&&disc<=0) return '';
+  let t=`RM${Number(perKg).toFixed(4)}/KG`;
+  if(mu>0&&disc>0) t+=` +RM${mu} −RM${disc} → RM${Number(finalPerKg).toFixed(4)}/KG`;
+  else if(mu>0)    t+=` +RM${mu} → RM${Number(finalPerKg).toFixed(4)}/KG`;
+  else             t+=` −RM${disc} → RM${Number(finalPerKg).toFixed(4)}/KG`;
+  return t;
+}
 function _buildMarkupPreviewText(base,mu,disc){
   if(mu<=0&&disc<=0) return '';
   const small=_isSmallCable(curSize);
@@ -1478,7 +1610,9 @@ function saveItem(){
   const markup=parseFloat($('inp-markup')?.value)||0;
   const discount=parseFloat($('inp-discount')?.value)||0;
   const price=parseFloat($('inp-price')?.value)||0;
-  const qty=parseInt($('inp-qty')?.value)||1;
+  // Copper Tape quantity is KG, which is naturally fractional (e.g. 27.5kg offcut) —
+  // every other unit (Meter, Coil, Drum, Roll, Set, Nos, Length) stays whole-number.
+  const qty=typeVal==='Copper Tape' ? (parseFloat($('inp-qty')?.value)||1) : (parseInt($('inp-qty')?.value)||1);
   const unit=$('sel-unit')?.value||'Meter';
   const stock=$('sel-stock')?.value||'no need to check';
   const drum=$('chk-drum')?.checked||false;
@@ -1500,6 +1634,7 @@ function saveItem(){
     item={isCustom:true,customName:cc.name||'',customIdx:ccIdx,price,qty,unit,stock,drum,remarks,waDesc:cc.waDesc||cc.name||''};
   } else {
     item={isCustom:false,category:typeVal,group:curGroup,size,colour,tier,markup,discount,price,qty,unit,stock,drum,remarks,waDesc:''};
+    if(typeVal==='Copper Tape') item.markupMode=tapeMarkupMode;
   }
 
   if(editIdx>=0) ST.items[editIdx]=item; else ST.items.push(item);
@@ -2080,15 +2215,43 @@ function parseExcelPrices(wb){
   // Try multiple sheet name variants to be resilient to naming differences
   const getRowsAny=(...names)=>{for(const n of names){const r=getRows(n);if(r.length)return r;}return[]};
 
-  // Read CS price from Masterlist cell Q4 (row 4, column Q = 17th col)
+  // LME threshold (USD/MT) — search Masterlist for the "LME" label, then take the first
+  // numeric cell to its right on the same row. Previously read a hardcoded cell (Q4), which
+  // had drifted from where the value actually lives (the real LME value sits at O4, right
+  // next to the "LME:" label at L4) — searched by label instead, same fix as Cu Tape below.
   let csUSD='';
   try{
-    const mlSheet=wb.Sheets['Masterlist'];
-    if(mlSheet){
-      const cell=mlSheet['Q4'];          // direct cell reference — most reliable
-      const raw=cell?(cell.v??cell.w):null; // .v = computed value, .w = formatted string
-      const n=parseFloat(raw);
-      if(!isNaN(n)&&n>0) csUSD=Number(n).toLocaleString('en-MY',{minimumFractionDigits:0,maximumFractionDigits:0});
+    const mlRows=getRows('Masterlist');
+    outerLme:
+    for(const row of mlRows){
+      for(let c=0;c<row.length;c++){
+        if(typeof row[c]==='string'&&row[c].trim().toLowerCase().startsWith('lme')){
+          for(let c2=c+1;c2<row.length;c2++){
+            const n=sf(row[c2]);
+            if(n!=null&&n>0){csUSD=Number(n).toLocaleString('en-MY',{minimumFractionDigits:0,maximumFractionDigits:0});break outerLme;}
+          }
+        }
+      }
+    }
+  }catch(e){}
+
+  // Copper Tape price (RM/KG) — search Masterlist for the "Cu Tape" label, then take the
+  // first numeric cell to its right on the same row. Searched rather than a fixed cell
+  // reference (like Q4 above) because label/value cell positions in this sheet have moved
+  // before between revisions.
+  let cuTapePerKg=null;
+  try{
+    const mlRows=getRows('Masterlist');
+    outer:
+    for(const row of mlRows){
+      for(let c=0;c<row.length;c++){
+        if(typeof row[c]==='string'&&row[c].trim().toLowerCase().startsWith('cu tape')){
+          for(let c2=c+1;c2<row.length;c2++){
+            const n=sf(row[c2]);
+            if(n!=null&&n>0){cuTapePerKg=n;break outer;}
+          }
+        }
+      }
     }
   }catch(e){}
 
@@ -2160,6 +2323,15 @@ function parseExcelPrices(wb){
   // FR cables
   for(const[lbl,s,e]of[['CU/Mica/PVC-FR',4,19],['CU/Mica/XLPE/PVC-FR',25,44],['CU/Mica/XLPE/LSZH',48,67],['CU/Mica/XLPO-LSZH',71,90]]){
     db[lbl]={};for(let i=s;i<=e&&i<fr.length;i++){const row=fr[i]||[];const size=sz(row[1]);if(!size)continue;db[lbl][size]=frE(row);}
+  }
+
+  // Copper Tape — flat RM/KG price, same for all sizes (no tier system, no per-size
+  // conversion). Sold and quantified purely by weight — quantity is entered in KG
+  // directly, so there's no coil price/weight to compute here at all.
+  if(cuTapePerKg!=null){
+    const tapeSizes=['25mm x 3mm','25mm x 6mm','50mm x 6mm'];
+    db['Copper Tape']={};
+    tapeSizes.forEach(size=>{ db['Copper Tape'][size]={perKg:cuTapePerKg}; });
   }
 
   return {prices:db, csUSD};
