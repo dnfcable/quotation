@@ -538,6 +538,8 @@ function _fmtPriceNum(it,n){
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const ini=n=>(n||'?').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
 const today=()=>{ const d=new Date(); return [d.getDate(),d.getMonth()+1,d.getFullYear()].map((v,i)=>i<2?String(v).padStart(2,'0'):v).join('/') };
+const _dmyToIso=v=>{const m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v||'');return m?`${m[3]}-${m[2]}-${m[1]}`:''};
+const _isoToDmy=v=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(v||'');return m?`${m[3]}/${m[2]}/${m[1]}`:''};
 function genRef(company){
   const d=new Date();
   const dateStr=String(d.getFullYear())+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
@@ -680,7 +682,7 @@ function renderQuote(){
 
   $('main').innerHTML = `
     <div style="font-size:12px;color:#a0aec0;display:flex;justify-content:space-between;margin-bottom:8px;padding:0 2px">
-      <span style="display:flex;align-items:center;gap:3px">Ref:&nbsp;<input value="${esc(ST.ref)}" oninput="ST.ref=this.value" style="border:none;border-bottom:1px dashed #cbd5e0;background:transparent;font-family:inherit;font-weight:700;color:#4a5568;font-size:12px;width:175px;padding:0 1px"></span><span>${ST.date}</span>
+      <span style="display:flex;align-items:center;gap:3px">Ref:&nbsp;<input value="${esc(ST.ref)}" oninput="ST.ref=this.value" style="border:none;border-bottom:1px dashed #cbd5e0;background:transparent;font-family:inherit;font-weight:700;color:#4a5568;font-size:12px;width:175px;padding:0 1px"></span><input type="date" value="${_dmyToIso(ST.date)}" onchange="ST.date=_isoToDmy(this.value)||ST.date" style="border:none;border-bottom:1px dashed #cbd5e0;background:transparent;font-family:inherit;color:#4a5568;font-size:12px;padding:0 1px">
     </div>
     ${custHtml}
     <div id="items-wrap">${itemsHtml}</div>`;
