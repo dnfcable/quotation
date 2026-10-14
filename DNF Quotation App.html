@@ -460,7 +460,7 @@ const COLOURS   = ["","Black","Red","Yellow","Blue","Green","Brown","Grey","Whit
 const UNITS     = ["Meter","Coil","Drum","Roll","Set","Nos","Length"];
 const DRUM_PRICE = 150;
 const SST = 0.10;
-const WA_FOOTER = `*DNF Cable Sdn Bhd*\n\n• Drum RM150 + 10% SST if (D) shown.\n• Prices subject to 10% SST.\n• First-come first-served basis.\n• Valid until 5pm daily.\n• Delivery charges for orders below RM3k.\n• Extra charges for site delivery.`;
+const WA_FOOTER = `*DNF Cable Sdn Bhd*\n\n• Drum RM150 + 10% SST if (D) shown.\n• Prices subject to 10% SST.\n• First-come first-served basis.\n• Valid until 5pm daily.\n• Delivery charges for orders below RM5k.\n• Extra charges for site delivery.`;
 
 // Size-list key → actual array (used by user-added cable types)
 const SIZE_GROUPS = {
@@ -577,6 +577,7 @@ function closeSheet(){ $('overlay').classList.remove('on'); $('sheet').classList
 function renderQuote(){
   $('hdr-title').textContent = 'DNF Quotation';
   $('hdr-right').innerHTML = `
+    <button class="hdr-btn" id="btn-paste-wa" title="Paste a WhatsApp message into this quote" onclick="openPasteWA()">📋</button>
     <button class="hdr-btn" id="btn-wa-icon" title="WhatsApp preview">💬</button>
     <button class="hdr-btn" id="btn-new" title="New quote">✚</button>`;
 
@@ -1601,6 +1602,108 @@ function refreshPriceHint(){
   } else {
     ph.innerHTML='';
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PASTE A WHATSAPP MESSAGE → FILL THE QUOTE
+//  Reverses buildMsg(): "{desc}{ (colour)} - {qty}{unit} [✅|❌]" / "[remarks]" / "RM{price}/{unit}[(D)]"
+// ══════════════════════════════════════════════════════════════
+function _waNorm(s){ return String(s||'').replace(/mm2\b/gi,'mm²').replace(/\s+/g,' ').trim().toLowerCase(); }
+
+// Exact-match index of every description buildDesc() can produce → {category,size}. Built from
+// buildDesc itself (not regexes) so it can't drift out of sync with how descriptions are written.
+function _waDescIndex(){
+  const idx={};
+  Object.keys(getCableTypes()).forEach(cat=>{
+    sizesFor(cat).forEach(size=>{
+      const k=_waNorm(buildDesc({category:cat,size}));
+      if(k&&!idx[k]) idx[k]={category:cat,size};
+    });
+  });
+  return idx;
+}
+
+function parseWAMessage(text){
+  const raws=[]; let pending=null, transport=null, skipped=0;
+  String(text||'').split(/\r?\n/).forEach(rawLine=>{
+    // WhatsApp Web/Desktop prefix copied messages with "[10:49 am, 1/10/2026] Name: "
+    const line=rawLine.replace(/^\[[^\]]{3,40}\]\s*[^:]{1,40}:\s*/,'').trim();
+    if(!line) return;
+    const tm=line.match(/^Transport Charge:\s*RM\s*([\d,]+(?:\.\d+)?)/i);
+    if(tm){ transport=parseFloat(tm[1].replace(/,/g,'')); return; }
+    const pm=line.match(/^RM\s*([\d,]+(?:\.\d+)?)\s*\/\s*([A-Za-z]+)\s*(\(D\))?\s*$/i);
+    if(pm){
+      if(pending){ pending.price=parseFloat(pm[1].replace(/,/g,'')); pending.drum=!!pm[3]; raws.push(pending); pending=null; }
+      return;
+    }
+    const im=line.match(/^(.+?)\s+-\s+([\d.,]+)\s*([A-Za-z]+)\s*(✅|❌)?\s*$/);
+    if(im){
+      if(pending) skipped++;   // previous item never got a price line
+      pending={desc:im[1].trim(), qty:parseFloat(im[2].replace(/,/g,'')), unitRaw:im[3], stock:im[4]==='✅'?'exstock':im[4]==='❌'?'no stock':'no need to check', remarks:[]};
+      return;
+    }
+    if(pending) pending.remarks.push(line);   // anything between the item line and its price line
+  });
+  if(pending) skipped++;
+
+  const idx=_waDescIndex(), cc=load('cc',[]), groups=getGroups();
+  let freeRows=0;
+  const items=raws.map(r=>{
+    const u=r.unitRaw.toLowerCase();
+    const unit=u==='mtr'?'Meter':u==='kg'?'KG':(UNITS.find(x=>x.toLowerCase()===u)||'Meter');
+    const remarks=r.remarks.join(' ');
+    const base={price:r.price,qty:r.qty,unit,stock:r.stock,drum:r.drum,remarks};
+    // 1) a built-in / user-defined cable type, optionally with a trailing "(Colour)"
+    let hit=idx[_waNorm(r.desc)], colour='';
+    const cm=r.desc.match(/\s*\(([^()]+)\)\s*$/);
+    if(!hit&&cm){
+      const col=COLOURS.find(c=>c&&c.toLowerCase()===cm[1].trim().toLowerCase());
+      const h=col&&idx[_waNorm(r.desc.slice(0,cm.index))];
+      if(h){hit=h;colour=col;}
+    }
+    if(hit){
+      const group=Object.keys(groups).find(g=>groups[g].includes(hit.category))||'Copper';
+      const item={isCustom:false,category:hit.category,group,size:hit.size,colour,tier:'',markup:0,discount:0,...base,waDesc:''};
+      if(hit.category==='Copper Tape') item.markupMode='pct';
+      return item;
+    }
+    // 2) a saved custom cable
+    const ccIdx=cc.findIndex(c=>_waNorm(c.waDesc||c.name)===_waNorm(r.desc)||_waNorm(c.name)===_waNorm(r.desc));
+    if(ccIdx>=0) return {isCustom:true,customName:cc[ccIdx].name||'',customIdx:ccIdx,...base,waDesc:cc[ccIdx].waDesc||cc[ccIdx].name||''};
+    // 3) unrecognised — keep it as a free row so nothing from the message is lost
+    freeRows++;
+    return {isCustom:true,isFreeRow:true,customName:r.desc,...base,waDesc:r.desc};
+  });
+  return {items,transport,skipped,freeRows};
+}
+
+function openPasteWA(){
+  openSheet(`
+    <div class="sh-body">
+      <div style="font-size:13px;color:#718096;line-height:1.5">Paste a WhatsApp quote message (the format the 💬 button produces) — its items are filled into this quote.</div>
+      <textarea class="inp" id="wa-paste-txt" rows="9" placeholder="Paste the WhatsApp message here…" style="font-family:inherit;resize:vertical"></textarea>
+      <button class="btn btn-grey btn-sm" onclick="pasteWAFromClipboard()">📋 Paste from clipboard</button>
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" id="wa-paste-replace"> Replace current items</label>
+    </div>
+    <div class="sh-foot">
+      <button class="btn btn-grey" onclick="closeSheet()">Cancel</button>
+      <button class="btn btn-navy btn-full" onclick="applyPastedWA()">✔ Fill into Quote</button>
+    </div>`,'Paste WhatsApp Message');
+  setTimeout(()=>$('wa-paste-txt')?.focus(),60);
+}
+async function pasteWAFromClipboard(){
+  try{ $('wa-paste-txt').value=await navigator.clipboard.readText(); }
+  catch{ toast('Clipboard blocked — long-press / Ctrl+V into the box instead'); }
+}
+function applyPastedWA(){
+  const res=parseWAMessage($('wa-paste-txt')?.value||'');
+  if(!res.items.length){ toast('No items found in that message'); return; }
+  if($('wa-paste-replace')?.checked) ST.items=[];
+  res.items.forEach(it=>ST.items.push(it));
+  if(res.transport>0) ST.transport=res.transport;
+  closeSheet(); renderQuote();
+  const n=res.items.length;
+  toast(`✅ ${n} item${n>1?'s':''} filled`+(res.freeRows?` · ${res.freeRows} not recognised → free row`:'')+(res.skipped?` · ${res.skipped} skipped (no price)`:''),4500);
 }
 
 function saveItem(){
